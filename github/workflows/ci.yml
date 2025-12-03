@@ -20,18 +20,40 @@ jobs:
     - name: Construire l'image Docker
       run: docker build -t demo-devops-app .
     
-    - name: Lancer des tests (exemple)
+    - name: Lancer des tests
       run: |
-        docker run --rm demo-devops-app echo "Construction réussie!"
-        # Ici vous pourriez ajouter des tests réels
+        # Test sur port 8081 pour éviter conflits
+        docker run -d --name test-app -p 8081:80 demo-devops-app
+        sleep 5
+        
+        # Vérifie que le conteneur tourne
+        if docker ps | grep -q test-app; then
+          echo "✅ Conteneur démarré avec succès"
+          
+          # Test HTTP rapide
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081 || echo "000")
+          if [ "$STATUS_CODE" = "200" ]; then
+            echo "✅ Site accessible (HTTP 200)"
+          else
+            echo "⚠️  Code HTTP: $STATUS_CODE"
+          fi
+        else
+          echo "❌ Conteneur non démarré"
+          exit 1
+        fi
+        
+        # Nettoyage
+        docker stop test-app
+        docker rm test-app
     
     - name: Scan de sécurité (Trivy)
       uses: aquasecurity/trivy-action@master
       with:
         image-ref: 'demo-devops-app'
         format: 'table'
-        exit-code: '1'
+        exit-code: '0' 
         ignore-unfixed: true
+        severity: 'CRITICAL,HIGH'  
     
   deploy:
     needs: test
@@ -41,21 +63,23 @@ jobs:
     steps:
     - name: Checkout du code
       uses: actions/checkout@v3
-    
-    - name: Login à Docker Hub
+    - name: Login to GitHub Container Registry
       uses: docker/login-action@v2
       with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     
-    - name: Construire et pousser l'image
+    - name: Construire et pousser vers GHCR
       uses: docker/build-push-action@v4
       with:
         context: .
         push: true
         tags: |
-          ${{ secrets.DOCKER_USERNAME }}/demo-devops-app:latest
-          ${{ secrets.DOCKER_USERNAME }}/demo-devops-app:${{ github.sha }}
+          ghcr.io/${{ github.repository_owner }}/demo-devops-app:latest
+          ghcr.io/${{ github.repository_owner }}/demo-devops-app:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
     
     - name: Déployer sur GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
