@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formulaire d'Inscription Démo DevOps</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+      color: #333;
+    }
+
+    .form-container {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+      width: 100%;
+      max-width: 450px;
+      backdrop-filter: blur(10px);
+      animation: fadeIn 0.8s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .form-header {
+      text-align: center;
+      margin-bottom: 30px;
+      position: relative;
+    }
+
+    .form-header h3 {
+      font-size: 28px;
+      color: #2d3436;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .form-header p {
+      color: #636e72;
+      font-size: 14px;
+    }
+
+    .form-header i {
+      color: #667eea;
+      margin-bottom: 15px;
+      font-size: 40px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #2d3436;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .form-group label i {
+      color: #667eea;
+      font-size: 14px;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 14px 15px;
+      border: 2px solid #dfe6e9;
+      border-radius: 10px;
+      font-size: 15px;
+      transition: all 0.3s ease;
+      background-color: #f8f9fa;
+    }
+
+    .form-control:focus {
+      border-color: #667eea;
+      background-color: white;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      outline: none;
+    }
+
+    .form-control.error {
+      border-color: #e74c3c;
+    }
+
+    .form-control.success {
+      border-color: #2ecc71;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 15px;
+      top: 40px;
+      background: none;
+      border: none;
+      color: #636e72;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .form-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 25px;
+      font-size: 14px;
+    }
+
+    .checkbox-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #636e72;
+    }
+
+    .checkbox-container input {
+      width: 16px;
+      height: 16px;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .btn-submit:hover {
+      background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 7px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-submit:active {
+      transform: translateY(0);
+    }
+
+    .form-links {
+      text-align: center;
+      margin-top: 25px;
+      font-size: 14px;
+      color: #636e72;
+    }
+
+    .form-links a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .form-links a:hover {
+      text-decoration: underline;
+    }
+
+    .error-message {
+      color: #e74c3c;
+      font-size: 13px;
+      margin-top: 5px;
+      display: none;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .form-container {
+        padding: 30px 25px;
+      }
+      
+      .form-header h3 {
+        font-size: 24px;
+      }
+      
+      .form-footer {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="form-container">
+    <div class="form-header">
+      <i class="fas fa-user-plus"></i>
+      <h3>Créer un compte</h3>
+      <p>Rejoignez notre plateforme en quelques minutes</p>
+    </div>
+    
+    <form id="inscriptionForm" action="#" method="post">
+      <div class="form-group">
+        <label for="nom"><i class="fas fa-user"></i> Nom complet</label>
+        <input type="text" id="nom" name="nom" class="form-control" placeholder="Votre nom et prénom" required>
+        <div class="error-message" id="nom-error">Le nom doit contenir au moins 2 caractères</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="email"><i class="fas fa-envelope"></i> AdresseEmail</label>
+        <input type="email" id="email" name="email" class="form-control" placeholder="exemple@email.com" required>
+        <div class="error-message" id="email-error">Veuillez entrer une adresse email valide</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="password"><i class="fas fa-lock"></i> Mot de passe</label>
+        <input type="password" id="password" name="password" class="form-control" placeholder="Au moins 8 caractères" required>
+        <button type="button" class="password-toggle" id="togglePassword">
+          <i class="far fa-eye"></i>
+        </button>
+        <div class="error-message" id="password-error">Le mot de passe doit contenir au minimum 8 caractères</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="pays"><i class="fas fa-globe"></i> Pays</label>
+        <select id="pays" name="pays" class="form-control" required>
+          <option value="">-- Sélectionnez votre pays --</option>
+          <option value="france">France</option>
+          <option value="gabon">Gabon</option>
+          <option value="canada">Canada</option>
+          <option value="belgique">Belgique</option>
+          <option value="suisse">Suisse</option>
+          <option value="autre">Autre</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="message"><i class="fas fa-comment"></i> Message (optionnel)</label>
+        <textarea id="message" name="message" class="form-control" rows="4" placeholder="Votre message..."></textarea>
+      </div>
+      
+      <div class="form-footer">
+        <div class="checkbox-container">
+          <input type="checkbox" id="newsletter" name="newsletter" checked>
+          <label for="newsletter">S'abonner à la newsletter</label>
+        </div>
+        <a href="#">Conditions d'utilisation</a>
+      </div>
+      
+      <button type="submit" class="btn-submit">
+        <i class="fas fa-paper-plane"></i> S'inscrire maintenant
+      </button>
+    </form>
+    
+    <div class="form-links">
+      <p>Déjà inscrit ? <a href="#">Se connecter</a></p>
+    </div>
+  </div>
+
+  <script>
+    // Fonction pour basculer la visibilité du mot de passe
+    document.getElementById('togglePassword').addEventListener('click', function() {
+      const passwordInput = document.getElementById('password');
+      const icon = this.querySelector('i');
+      
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+      } else {
+        passwordInput.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+      }
+    });
+
+    // Validation en temps réel
+    document.getElementById('inscriptionForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+      
+      let isValid = true;
+      
+      // Validation du nom
+      const nom = document.getElementById('nom');
+      const nomError = document.getElementById('nom-error');
+      if (nom.value.trim().length < 2) {
+        nom.classList.add('error');
+        nom.classList.remove('success');
+        nomError.style.display = 'block';
+        isValid = false;
+      } else {
+        nom.classList.remove('error');
+        nom.classList.add('success');
+        nomError.style.display = 'none';
+      }
+      
+      // Validation de l'email
+      const email = document.getElementById('email');
+      const emailError = document.getElementById('email-error');
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.value)) {
+        email.classList.add('error');
+        email.classList.remove('success');
+        emailError.style.display = 'block';
+        isValid = false;
+      } else {
+        email.classList.remove('error');
+        email.classList.add('success');
+        emailError.style.display = 'none';
+      }
+      
+      // Validation du mot de passe
+      const password = document.getElementById('password');
+      const passwordError = document.getElementById('password-error');
+      if (password.value.length < 8) {
+        password.classList.add('error');
+        password.classList.remove('success');
+        passwordError.style.display = 'block';
+        isValid = false;
+      } else {
+        password.classList.remove('error');
+        password.classList.add('success');
+        passwordError.style.display = 'none';
+      }
+      
+      // Si tout est valide, simuler l'envoi
+      if (isValid) {
+        const btn = document.querySelector('.btn-submit');
+        const originalText = btn.innerHTML;
+        
+        // Animation de chargement
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Traitement en cours...';
+        btn.disabled = true;
+        
+        // Simulation d'envoi (remplacer par un vrai appel API)
+        setTimeout(() => {
+          alert('Formulaire soumis avec succès ! (Cette alerte simule un envoi réussi)');
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+          
+          // Réinitialiser les styles de succès
+          document.querySelectorAll('.form-control').forEach(input => {
+            input.classList.remove('success');
+          });
+          
+          // Réinitialiser le formulaire
+          document.getElementById('inscriptionForm').reset();
+        }, 1500);
+      }
+    });
+
+    // Validation en temps réel pour une meilleure UX
+    document.querySelectorAll('.form-control').forEach(input => {
+      input.addEventListener('blur', function() {
+        if (this.value.trim() !== '') {
+          this.classList.add('success');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

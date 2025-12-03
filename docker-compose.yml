@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  webapp:
+    build: .
+    container_name: demo-devops-app
+    ports:
+      - "8080:80"  # Port local:Port conteneur
+    restart: unless-stopped
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+    environment:
+      - NODE_ENV=production
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
