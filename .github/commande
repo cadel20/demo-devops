@@ -1,0 +1,8 @@
+
+
+# 2. Construire l'image
+docker build -t demo-devops-app .
+
+# 3. Lancer le conteneur
+docker run -d -p 8080:80 --name devops-app demo-devops-app
+
