@@ -54,7 +54,7 @@ jobs:
   # ======================
   # 2. TERRAFORM (NOUVEAU)
   # ======================
- terraform:
+  terraform:
   runs-on: ubuntu-latest
   needs: test-docker
   
