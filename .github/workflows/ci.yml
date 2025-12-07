@@ -2,7 +2,7 @@ name: 🐳 CI Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - '**.py'
       - '**.js'
