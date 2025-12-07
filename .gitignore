@@ -1,0 +1,14 @@
+# Ajoutez à votre .gitignore
+echo "# Terraform
+terraform.tfstate
+terraform.tfstate.backup
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# Fichiers générés par Terraform (optionnel)
+terraform-test.txt
+documentation-projet.md
+rapports/
+Dockerfile-terraform" >> .gitignore

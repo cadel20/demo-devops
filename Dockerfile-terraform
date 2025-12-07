@@ -1,0 +1,12 @@
+# Dockerfile généré par Terraform
+FROM nginx:alpine
+    
+LABEL mainteneur="cadel20"
+LABEL version="1.0"
+LABEL description="Projet d'apprentissage DevOps"
+    
+COPY index.html /usr/share/nginx/html/
+    
+EXPOSE 80
+    
+CMD ["nginx", "-g", "daemon off;"]

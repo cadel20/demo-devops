@@ -4,5 +4,10 @@
 docker build -t demo-devops-app .
 
 # 3. Lancer le conteneur
+docker tag demo-devops-app VOTRE_USERNAME/demo-devops-app:latest
+docker login
+docker push VOTRE_USERNAME/demo-devops-app:latest
+docker pull VOTRE_USERNAME/demo-devops-app:latest
 docker run -d -p 8080:80 --name devops-app demo-devops-app
-
+docker run -d -p 8080:80 VOTRE_USERNAME/demo-devops-app:latest
+dckr_pat_pf0hc84rihPBCqt0c4wB-hTxqYM

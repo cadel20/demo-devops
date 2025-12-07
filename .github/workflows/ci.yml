@@ -1,4 +1,4 @@
-name: CI Pipeline with Docker
+name: CI/CD Pipeline Complet
 
 on:
   push:
@@ -6,8 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
-  test:
+  # ======================
+  # 1. TESTS DOCKER (existant)
+  # ======================
+  test-docker:
     runs-on: ubuntu-latest
     
     steps:
@@ -20,22 +28,82 @@ jobs:
     - name: Construire l'image Docker
       run: docker build -t demo-devops-app .
     
-    - name: Lancer des tests (exemple)
+    - name: Lancer des tests
       run: |
-        docker run --rm demo-devops-app echo "Construction réussie!"
-        # Ici vous pourriez ajouter des tests réels
+        # Test sur port 8081 pour éviter conflits
+        docker run -d --name test-app -p 8081:80 demo-devops-app
+        sleep 5
+        if docker ps | grep -q test-app; then
+          echo "✅ Conteneur démarré"
+          docker stop test-app
+          docker rm test-app
+        else
+          echo "❌ Conteneur non démarré"
+          exit 1
+        fi
     
     - name: Scan de sécurité (Trivy)
-      continue-on-error: true 
+      continue-on-error: true
       uses: aquasecurity/trivy-action@master
       with:
         image-ref: 'demo-devops-app'
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
+
+  # ======================
+  # 2. TERRAFORM (NOUVEAU)
+  # ======================
+  terraform:
+    runs-on: ubuntu-latest
+    needs: test-docker  # Attendre que Docker soit testé
     
+    steps:
+    - name: Checkout du code
+      uses: actions/checkout@v3
+    
+    - name: Installer Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: "1.6.0"
+    
+    - name: Initialiser Terraform
+      run: |
+        if [ -d "infrastructure" ]; then
+          cd infrastructure
+          terraform init
+        else
+          echo "⚠️  Dossier infrastructure non trouvé, création..."
+          mkdir -p infrastructure
+          echo '# Terraform pour DevOps' > infrastructure/main.tf
+          cd infrastructure
+          terraform init
+        fi
+    
+    - name: Valider la syntaxe Terraform
+      run: |
+        if [ -d "infrastructure" ]; then
+          cd infrastructure
+          terraform validate
+          echo "✅ Syntaxe Terraform valide"
+        else
+          echo "✅ Pas de configuration Terraform à valider"
+        fi
+    
+    - name: Voir le plan Terraform
+      run: |
+        if [ -d "infrastructure" ]; then
+          cd infrastructure
+          terraform plan -no-color
+        else
+          echo "ℹ️  Pas de plan Terraform à afficher"
+        fi
+
+  # ======================
+  # 3. DÉPLOIEMENT (existant amélioré)
+  # ======================
   deploy:
-    needs: test
+    needs: [test-docker, terraform]  # Attendre Docker ET Terraform
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     
@@ -43,13 +111,16 @@ jobs:
     - name: Checkout du code
       uses: actions/checkout@v3
     
+    # OPTION A : Docker Hub (gardé)
     - name: Login à Docker Hub
+      if: secrets.DOCKER_USERNAME != ''
       uses: docker/login-action@v2
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
     
-    - name: Construire et pousser l'image
+    - name: Construire et pousser l'image Docker
+      if: secrets.DOCKER_USERNAME != ''
       uses: docker/build-push-action@v4
       with:
         context: .
@@ -58,8 +129,68 @@ jobs:
           ${{ secrets.DOCKER_USERNAME }}/demo-devops-app:latest
           ${{ secrets.DOCKER_USERNAME }}/demo-devops-app:${{ github.sha }}
     
+    # OPTION B : GitHub Container Registry (gardé)
+    - name: Login to GitHub Container Registry
+      if: secrets.DOCKER_USERNAME == ''
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Construire et pousser vers GHCR
+      if: secrets.DOCKER_USERNAME == ''
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository_owner }}/demo-devops-app:latest
+          ghcr.io/${{ github.repository_owner }}/demo-devops-app:${{ github.sha }}
+    
+    # Déploiement GitHub Pages (gardé)
     - name: Déployer sur GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./
+        force_orphan: true
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+    
+    # NOUVEAU : Exécuter Terraform apply (optionnel)
+    - name: Appliquer Terraform (si configuré)
+      if: github.ref == 'refs/heads/main' && vars.TERRAFORM_AUTO_APPLY == 'true'
+      run: |
+        if [ -d "infrastructure" ]; then
+          cd infrastructure
+          echo "🚀 Application de la configuration Terraform..."
+          terraform apply -auto-approve
+        fi
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  # ======================
+  # 4. NOTIFICATION (optionnel)
+  # ======================
+  notification:
+    needs: [test-docker, terraform, deploy]
+    runs-on: ubuntu-latest
+    if: always()  # S'exécute même en cas d'échec
+    
+    steps:
+    - name: Résumé du pipeline
+      run: |
+        echo "========================================"
+        echo "🚀 PIPELINE CI/CD COMPLET"
+        echo "========================================"
+        echo ""
+        echo "✅ Tests Docker: ${{ needs.test-docker.result }}"
+        echo "✅ Validation Terraform: ${{ needs.terraform.result }}"
+        echo "✅ Déploiement: ${{ needs.deploy.result }}"
+        echo ""
+        echo "🌐 Site web: https://cadel20.github.io/demo-devops/"
+        echo "🐳 Image Docker: demo-devops-app"
+        echo "🏗️  Infrastructure: Terraform"
+        echo "========================================"
