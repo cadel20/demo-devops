@@ -1,4 +1,4 @@
-name: ⚡ Deploy du site HTML 
+name: 🐳 Deploy du site HTML 
 
 on:
   push:
