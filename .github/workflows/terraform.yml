@@ -3,6 +3,9 @@ name: 🏗️ Terraform Validation
 on:
   push:
     branches: [main]
+    paths:
+      - 'infrastructure/**'
+      - '**.tf'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -14,27 +17,59 @@ jobs:
     steps:
     - name: 📥 Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Récupère tout l'historique
     
-    - name: 🔍 Détection automatique
-      id: detect
+    - name: 🔍 Debug - Analyse du commit
       run: |
-        echo "🔍 Recherche de fichiers Terraform..."
+        echo "🔍 ANALYSE DU DÉCLENCHEMENT"
+        echo "============================="
+        echo "📅 Commit SHA: ${{ github.sha }}"
+        echo "🏷️  Branche: ${{ github.ref }}"
+        echo "👤 Auteur: ${{ github.actor }}"
+        echo ""
         
-        # Chercher tous les fichiers .tf
-        TF_FILES=$(find . -name "*.tf" -type f 2>/dev/null | wc -l)
-        TF_DIRS=$(find . -name "*.tf" -type f -exec dirname {} \; 2>/dev/null | sort -u | head -5)
+        # Voir les fichiers modifiés dans le dernier commit
+        echo "📋 Fichiers modifiés dans ce commit:"
+        if [ "${{ github.event_name }}" = "push" ]; then
+          # Pour push, comparer avec le commit précédent
+          git diff --name-only ${{ github.event.before }} ${{ github.sha }} 2>/dev/null || \
+          echo "Premier commit sur cette branche"
+        else
+          # Pour PR ou autre
+          git log -1 --name-only --oneline
+        fi
+        
+        echo ""
+        echo "🔍 Fichiers correspondant aux patterns:"
+        echo "- Dans infrastructure/:"
+        find infrastructure -type f 2>/dev/null | head -10 || echo "  (aucun)"
+        echo "- Fichiers .tf à la racine:"
+        find . -maxdepth 1 -name "*.tf" 2>/dev/null || echo "  (aucun)"
+        echo "============================="
+    
+    - name: ⚙️ Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: "1.6.0"
+    
+    - name: 🔍 Vérifier fichiers
+      id: check-files
+      run: |
+        echo "🔎 Vérification des fichiers Terraform..."
+        
+        # Chercher des fichiers .tf n'importe où
+        ALL_TF_FILES=$(find . -name "*.tf" -type f 2>/dev/null | wc -l)
+        INFRA_TF_FILES=$(find infrastructure -name "*.tf" -type f 2>/dev/null | wc -l)
         
         echo "📊 Statistiques:"
-        echo "  Fichiers .tf trouvés: $TF_FILES"
+        echo "  Total fichiers .tf: $ALL_TF_FILES"
+        echo "  Fichiers dans infrastructure/: $INFRA_TF_FILES"
         
-        if [ $TF_FILES -gt 0 ]; then
+        if [ $ALL_TF_FILES -gt 0 ]; then
           echo "✅ Terraform détecté"
-          echo "📁 Dossiers contenant .tf:"
-          echo "$TF_DIRS"
-          
-          # Prendre le premier dossier (généralement infrastructure/)
-          MAIN_TF_DIR=$(echo "$TF_DIRS" | head -1)
-          echo "MAIN_DIR=$MAIN_TF_DIR" >> $GITHUB_ENV
+          echo "📋 Liste des fichiers:"
+          find . -name "*.tf" -type f 2>/dev/null | head -10
           echo "has_tf=true" >> $GITHUB_OUTPUT
         else
           echo "ℹ️  Aucun fichier Terraform (.tf) trouvé"
@@ -42,46 +77,48 @@ jobs:
         fi
     
     - name: 🏗️ Init & Validate
-      if: steps.detect.outputs.has_tf == 'true'
-      working-directory: ${{ env.MAIN_DIR }}
+      if: steps.check-files.outputs.has_tf == 'true'
+      working-directory: ./infrastructure
       run: |
-        echo "🔧 Initialisation Terraform dans: $(pwd)"
+        echo "🔧 Initialisation Terraform..."
         terraform init -input=false
         
         echo "✅ Validation syntaxique..."
         terraform validate
         
-        echo "📝 Formatage automatique..."
+        echo "📝 Application du formatage standard..."
         terraform fmt
         
-        echo "✓ Terraform prêt"
+        echo "✓ Formatage appliqué"
     
     - name: 📋 Plan Terraform
-      if: steps.detect.outputs.has_tf == 'true'
-      working-directory: ${{ env.MAIN_DIR }}
+      if: steps.check-files.outputs.has_tf == 'true'
+      working-directory: ./infrastructure
       run: |
-        echo "📋 Génération du plan..."
+        echo "📋 Génération du plan Terraform..."
         terraform plan -no-color
     
-    - name: 📊 Rapport
+    - name: 📊 Rapport final
       if: always()
       run: |
         echo ""
         echo "========================================"
-        echo "     🏗️  RAPPORT TERRAFORM VALIDATION    "
+        echo "          🏗️  RAPPORT TERRAFORM          "
         echo "========================================"
         echo "📅 Date: $(date)"
         echo "🏷️  Branche: ${{ github.ref }}"
+        echo "🔗 SHA: ${GITHUB_SHA:0:8}"
         echo "🔄 Événement: ${{ github.event_name }}"
-        echo "📊 Terraform détecté: ${{ steps.detect.outputs.has_tf }}"
+        echo "📊 Terraform détecté: ${{ steps.check-files.outputs.has_tf }}"
         
-        if [ "${{ steps.detect.outputs.has_tf }}" = "true" ]; then
-          echo "📁 Dossier: ${{ env.MAIN_DIR }}"
+        if [ "${{ steps.check-files.outputs.has_tf }}" = "true" ]; then
           echo "✅ Workflow exécuté avec succès"
+          echo "💾 Validation terminée"
         else
-          echo "ℹ️  Aucune configuration Terraform trouvée"
-          echo "💡 Pour utiliser Terraform:"
-          echo "   1. Créez un dossier 'infrastructure/'"
-          echo "   2. Ajoutez des fichiers .tf (main.tf, variables.tf...)"
+          echo "ℹ️  Workflow non exécuté (pas de fichiers Terraform)"
+          echo "💡 Pour déclencher ce workflow:"
+          echo "   1. Modifiez un fichier dans 'infrastructure/'"
+          echo "   2. Créez/modifiez un fichier '.tf'"
+          echo "   3. Utilisez 'Run workflow' manuellement"
         fi
         echo "========================================"
