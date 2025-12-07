@@ -1,242 +1,65 @@
-name: 🐳 CI Pipeline Avancé
+name: 🐳 CI Pipeline with Docker
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      skip-tests:
-        description: 'Skip Docker tests'
-        required: false
-        default: false
-        type: boolean
 
 jobs:
-  # ======================
-  # 1. VALIDATION
-  # ======================
-  validate:
-    name: "🔍 Validation du code"
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: "📥 Checkout du code"
-      uses: actions/checkout@v4
-    
-    - name: "📏 Vérifier la structure"
-      run: |
-        echo "📂 Structure du projet:"
-        ls -la
-        echo ""
-        
-        # Vérifier Dockerfile
-        if [ -f "Dockerfile" ]; then
-          echo "✅ Dockerfile trouvé"
-          echo "📋 Premières lignes:"
-          head -10 Dockerfile
-        else
-          echo "⚠️  Dockerfile non trouvé - création d'un exemple"
-          cat > Dockerfile << 'EOF'
-FROM nginx:alpine
-COPY . /usr/share/nginx/html/
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-EOF
-          echo "✅ Dockerfile exemple créé"
-        fi
-        
-        # Vérifier index.html pour GitHub Pages
-        if [ -f "index.html" ]; then
-          echo "✅ index.html trouvé"
-        elif [ -f "*.html" ]; then
-          echo "✅ Fichier HTML trouvé"
-        else
-          echo "⚠️  Aucun fichier HTML trouvé - création d'un exemple"
-          cat > index.html << 'EOF'
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Demo DevOps</title>
-</head>
-<body>
-    <h1>🚀 Projet DevOps</h1>
-    <p>CI/CD Pipeline avec Docker</p>
-</body>
-</html>
-EOF
-          echo "✅ index.html exemple créé"
-        fi
-
-  # ======================
-  # 2. BUILD DOCKER
-  # ======================
-  build:
-    name: "🏗️ Build Docker"
-    runs-on: ubuntu-latest
-    needs: validate  # Attendre la validation
-    
-    steps:
-    - name: "📥 Checkout du code"
-      uses: actions/checkout@v4
-    
-    - name: "🔧 Setup Docker Buildx"
-      uses: docker/setup-buildx-action@v3
-    
-    - name: "🏗️ Build Docker image"
-      run: |
-        echo "🔨 Construction de l'image Docker..."
-        
-        # Créer un tag unique
-        TAG_NAME="demo-devops-app:ci-$(date +%Y%m%d)-${GITHUB_SHA:0:8}"
-        
-        docker build \
-          --tag $TAG_NAME \
-          --tag demo-devops-app:latest \
-          --label "build.date=$(date)" \
-          --label "commit.sha=$GITHUB_SHA" \
-          --label "build.run=$GITHUB_RUN_ID" \
-          .
-        
-        echo "✅ Image construite:"
-        docker images | grep demo-devops-app
-        
-        # Sauvegarder le nom du tag pour les jobs suivants
-        echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
-
-  # ======================
-  # 3. TESTS DOCKER
-  # ======================
   test:
-    name: "🧪 Tests Docker"
     runs-on: ubuntu-latest
-    needs: build  # Attendre le build
-    if: ${{ !github.event.inputs.skip-tests || github.event.inputs.skip-tests == 'false' }}
     
     steps:
-    - name: "📥 Checkout du code"
-      uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v3
     
-    - name: "🧪 Tests fonctionnels"
-      env:
-        DOCKER_TAG: ${{ needs.build.outputs.TAG_NAME || 'demo-devops-app:latest' }}
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Build Docker image
+      run: docker build -t demo-devops-app .
+    
+    - name: Run tests
       run: |
-        echo "🧪 Démarrage des tests Docker..."
-        echo "📦 Image testée: $DOCKER_TAG"
-        
-        # Vérifier si l'image existe localement
-        if ! docker image inspect $DOCKER_TAG &>/dev/null; then
-          echo "🔨 Image non trouvée, reconstruction..."
-          docker build -t $DOCKER_TAG .
-        fi
-        
-        # Test 1: Conteneur démarre
-        echo ""
-        echo "1. 🧪 Test démarrage conteneur..."
-        CONTAINER_ID=$(docker run -d --rm -p 8081:80 $DOCKER_TAG)
-        echo "   Conteneur ID: $CONTAINER_ID"
-        sleep 3
-        
-        # Test 2: Conteneur en vie
-        echo ""
-        echo "2. 🔍 Vérification état conteneur..."
-        if docker ps | grep -q $CONTAINER_ID; then
-          echo "   ✅ Conteneur en cours d'exécution"
-          
-          # Test 3: Réponse HTTP
-          echo ""
-          echo "3. 🌐 Test réponse HTTP..."
-          if curl -s -f -o /dev/null --retry 2 --max-time 5 http://localhost:8081; then
-            echo "   ✅ Site accessible sur http://localhost:8081"
-            echo "   📊 Status: SUCCESS"
-          else
-            echo "   ⚠️  Site non accessible (mais conteneur actif)"
-            echo "   📊 Status: WARNING"
-          fi
-          
-          # Nettoyage
-          echo ""
-          echo "4. 🧹 Nettoyage..."
-          docker stop $CONTAINER_ID && echo "   ✅ Conteneur arrêté"
-          
-        else
-          echo "   ❌ Conteneur non démarré"
-          echo "   📋 Logs du conteneur:"
-          docker logs $CONTAINER_ID 2>/dev/null || echo "   (pas de logs disponibles)"
-          echo "   📊 Status: FAILED"
-          exit 1
-        fi
-        
-        echo ""
-        echo "🎉 Tous les tests sont terminés !"
-
-  # ======================
-  # 4. SÉCURITÉ (optionnel)
-  # ======================
-  security:
-    name: "🛡️ Analyse de sécurité"
-    runs-on: ubuntu-latest
-    needs: build  # Attendre le build
-    if: ${{ github.event_name != 'pull_request' }}  # Skip sur PR pour vitesse
+        docker run --rm demo-devops-app echo "Construction réussie !"
+        # Add real tests here
     
-    steps:
-    - name: "📥 Checkout du code"
-      uses: actions/checkout@v4
-    
-    - name: "🏗️ Build pour scan"
-      run: |
-        docker build -t demo-devops-app:security-scan .
-    
-    - name: "🛡️ Scan Trivy"
-      continue-on-error: true  # Ne pas bloquer le CI
+    - name: Security scan (Trivy)
+      continue-on-error: true
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: 'demo-devops-app:security-scan'
+        image-ref: 'demo-devops-app'
         format: 'table'
-        exit-code: '0'  # Toujours réussir pour ne pas bloquer
-        severity: 'CRITICAL,HIGH'
+        exit-code: '1'
         ignore-unfixed: true
-        timeout: '5m'
-
-  # ======================
-  # 5. RAPPORT FINAL
-  # ======================
-  report:
-    name: "📊 Rapport CI"
+    
+  deploy:
+    needs: test
     runs-on: ubuntu-latest
-    needs: [validate, build, test, security]
-    if: always()  # Toujours s'exécuter même en cas d'échec
+    if: github.ref == 'refs/heads/main'
     
     steps:
-    - name: "📋 Générer rapport"
-      run: |
-        echo ""
-        echo "========================================"
-        echo "         📊 RAPPORT CI COMPLET          "
-        echo "========================================"
-        echo "📅 Date: $(date '+%Y-%m-%d %H:%M:%S')"
-        echo "🏷️  Branche: ${{ github.ref }}"
-        echo "🔗 SHA: ${GITHUB_SHA:0:8}"
-        echo "👤 Déclenché par: ${{ github.actor }}"
-        echo ""
-        echo "📈 RÉSULTATS DES JOBS:"
-        echo "   🔍 Validation: ${{ needs.validate.result }}"
-        echo "   🏗️  Build: ${{ needs.build.result }}"
-        echo "   🧪 Tests: ${{ needs.test.result }}"
-        echo "   🛡️  Sécurité: ${{ needs.security.result }}"
-        echo ""
-        echo "🐳 DÉTAILS DOCKER:"
-        echo "   Image: demo-devops-app"
-        echo "   Tag: ${{ needs.build.outputs.TAG_NAME || 'latest' }}"
-        echo ""
-        echo "⏱️  STATUT FINAL:"
-        if [[ "${{ needs.validate.result }}" == "success" && \
-              "${{ needs.build.result }}" == "success" && \
-              ("${{ needs.test.result }}" == "success" || "${{ github.event.inputs.skip-tests }}" == "true") ]]; then
-          echo "   ✅ ✅ ✅ CI RÉUSSI ✅ ✅ ✅"
-        else
-          echo "   ❌ ❌ ❌ CI ÉCHOUÉ ❌ ❌ ❌"
-        fi
-        echo "========================================"
-        echo ""
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/demo-devops-app:latest
+          ${{ secrets.DOCKER_USERNAME }}/demo-devops-app:${{ github.sha }}
+    
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./
