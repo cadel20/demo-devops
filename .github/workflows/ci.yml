@@ -16,20 +16,21 @@ jobs:
     
     - name: Setup Docker Buildx
       uses: docker/setup-buildx-action@v2
+      with:
+        driver: docker-container  # ⭐ AJOUTEZ CETTE LIGNE
     
-    - name: Build Docker image (test)
-      run: |
-        docker build -t demo-devops-app-test .
+    - name: Build Docker image
+      run: docker build -t demo-devops-app .
     
     - name: Run tests
       run: |
-        docker run --rm demo-devops-app-test echo "✅ Test passed"
+        docker run --rm demo-devops-app echo "Construction réussie !"
     
     - name: Security scan (Trivy)
       continue-on-error: true
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: 'demo-devops-app-test'
+        image-ref: 'demo-devops-app'
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
@@ -43,13 +44,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
     
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      with:
+        driver: docker-container  # ⭐ AJOUTEZ CETTE LIGNE
+    
     - name: Login to Docker Hub
       uses: docker/login-action@v2
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
     
-    - name: Build and push Docker image (FRESH)
+    - name: Build and push Docker image
       uses: docker/build-push-action@v4
       with:
         context: .
@@ -57,9 +63,17 @@ jobs:
         tags: |
           ${{ secrets.DOCKER_USERNAME }}/demo-devops-app:latest
           ${{ secrets.DOCKER_USERNAME }}/demo-devops-app:${{ github.sha }}
-        cache-from: type=gha  # Cache GitHub Actions
-        cache-to: type=gha,mode=max
-        # Pas de no-cache nécessaire car le SHA change à chaque commit
+        # ⭐ CHOISISSEZ UNE OPTION :
+        # Option A : Pas de cache (simple)
+        # (rien)
+        
+        # Option B : Cache registry
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/demo-devops-app:latest
+        cache-to: type=inline
+        
+        # Option C : Cache local seulement
+        # cache-from: type=local,src=/tmp/.buildx-cache
+        # cache-to: type=local,dest=/tmp/.buildx-cache
     
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
