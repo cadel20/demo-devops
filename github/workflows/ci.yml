@@ -1,4 +1,4 @@
-name: CI Pipeline with Docker
+name: 🐳 CI Pipeline with Docker
 
 on:
   push:
