@@ -54,7 +54,67 @@ jobs:
   # ======================
   # 2. TERRAFORM (NOUVEAU)
   # ======================
-  terraform:
+ terraform:
+  runs-on: ubuntu-latest
+  needs: test-docker
+  
+  env:
+    TF_IN_AUTOMATION: true
+    TF_WORKSPACE: dev
+  
+  steps:
+  - uses: actions/checkout@v3
+  
+  - name: Setup Terraform
+    uses: hashicorp/setup-terraform@v2
+    with:
+      terraform_version: "1.6.0"
+      terraform_wrapper: false
+  
+  - name: Cache Terraform
+    uses: actions/cache@v3
+    with:
+      path: infrastructure/.terraform
+      key: ${{ runner.os }}-terraform-${{ hashFiles('infrastructure/**/*.tf') }}
+  
+  - name: Vérifier fichiers Terraform
+    id: tf-files
+    working-directory: ./infrastructure
+    run: |
+      if [ -n "$(find . -name '*.tf' -o -name '*.tf.json')" ]; then
+        echo "has_tf_files=true" >> $GITHUB_OUTPUT
+      else
+        echo "has_tf_files=false" >> $GITHUB_OUTPUT
+      fi
+  
+  - name: Initialiser Terraform
+    if: steps.tf-files.outputs.has_tf_files == 'true'
+    working-directory: ./infrastructure
+    run: terraform init -input=false
+  
+  - name: Validation Terraform
+    if: steps.tf-files.outputs.has_tf_files == 'true'
+    working-directory: ./infrastructure
+    run: terraform validate
+  
+  - name: Format check
+    if: steps.tf-files.outputs.has_tf_files == 'true'
+    working-directory: ./infrastructure
+    run: terraform fmt -check -diff
+  
+  - name: Plan Terraform
+    if: steps.tf-files.outputs.has_tf_files == 'true'
+    working-directory: ./infrastructure
+    run: terraform plan -no-color -out=tfplan
+    
+  # Upload le plan pour inspection
+  - name: Upload Terraform Plan
+    if: steps.tf-files.outputs.has_tf_files == 'true'
+    uses: actions/upload-artifact@v3
+    with:
+      name: terraform-plan
+      path: infrastructure/tfplan
+      retention-days: 1
     runs-on: ubuntu-latest
     needs: test-docker  # Attendre que Docker soit testé
     
