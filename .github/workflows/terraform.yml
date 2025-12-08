@@ -1,5 +1,5 @@
 # .github/workflows/terraform.yml
-name: Terraform + Docker (AUTOMATIQUE)
+name: Terraform 
 
 # Se déclenche automatiquement à chaque push sur main
 on:
