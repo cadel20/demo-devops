@@ -1,25 +1,19 @@
-# Configuration avec les versions DÉJÀ installées sur votre système
+# Configuration minimale et sécurisée
 terraform {
   required_version = ">= 1.0.0"
   
   required_providers {
     random = {
       source  = "hashicorp/random"
-      version = "3.7.2"  # Version déjà installée sur votre système
+      version = "~> 3.5.1"
     }
     
     local = {
       source  = "hashicorp/local"
-      version = "2.6.1"  # Version déjà installée sur votre système
-    }
-    
-    null = {
-      source  = "hashicorp/null"
-      version = "3.2.4"  # Version déjà installée
+      version = "~> 2.4.0"
     }
   }
 }
 
 provider "random" {}
 provider "local" {}
-provider "null" {}
