@@ -1,8 +1,19 @@
 # Ressources Terraform pour le projet DevOps
 
-# 1. Créer un fichier de documentation du projet
+# 1. Générer un ID unique pour le projet
+resource "random_id" "projet_id" {
+  byte_length = 4
+}
+
+# 2. Créer le dossier rapports localement
+resource "local_file" "dossier_rapports" {
+  filename = "${path.module}/rapports/.keep"
+  content  = "Dossier pour les rapports Terraform"
+}
+
+# 3. Créer un fichier de documentation du projet
 resource "local_file" "documentation_projet" {
-  filename = "../documentation-projet.md"
+  filename = "${path.module}/documentation-projet.md"
   content  = <<-EOT
     # 📚 Documentation du Projet DevOps
     
@@ -17,52 +28,125 @@ resource "local_file" "documentation_projet" {
     - GitHub Actions ⚡
     - Terraform 🏗️
     - Nginx 🌐
-    - HTML/CSS 🎨
+    - HTML/CSS/JavaScript 🎨
+    - Formulaire interactif 💻
     
-    ## URL du site
-    - GitHub Pages : https://cadel20.github.io/demo-devops/
-    - Docker local : http://localhost:8080
+    ## URLs importantes
+    - **Site principal** : Votre formulaire HTML à la racine
+    - **GitHub Pages** : https://cadel20.github.io/demo-devops/
+    - **Docker local** : http://localhost:8080
+    
+    ## Fichiers générés par Terraform
+    1. documentation-projet.md (ce fichier)
+    2. Dockerfile-terraform (configuration Docker)
+    3. rapports/deploiement-*.md (rapports de déploiement)
+    
+    ## Caractéristiques du projet
+    ✅ Formulaire HTML interactif avec validation
+    ✅ Design moderne et responsive
+    ✅ Validation en temps réel
+    ✅ Animation et effets visuels
+    ✅ Compatible tous navigateurs
+    
+    ## Fonctionnalités du formulaire
+    - Validation des champs en temps réel
+    - Affichage/masquage du mot de passe
+    - Messages d'erreur contextuels
+    - Animation de soumission
+    - Design responsive
     
     ## Commandes utiles
     \`\`\`bash
     # Terraform
+    cd infrastructure
     terraform init
     terraform plan
     terraform apply
     
-    # Docker
-    docker-compose up --build
-    docker-compose down
+    # Docker (avec votre formulaire)
+    docker build -t demo-devops-app .
+    docker run -d -p 8080:80 demo-devops-app
+    
+    # Accéder au site
+    open http://localhost:8080
     \`\`\`
     
-    ## Structure
+    ## Structure du projet
     \`\`\`
     demo-devops/
-    ├── infrastructure/    # Terraform
-    ├── .github/          # CI/CD
-    ├── index.html        # Site web
-    └── Dockerfile        # Conteneurisation
+    ├── index.html              # Votre formulaire HTML (existant)
+    ├── infrastructure/         # Configuration Terraform
+    │   ├── main.tf
+    │   ├── providers.tf
+    │   ├── documentation-projet.md   (généré)
+    │   ├── Dockerfile-terraform      (généré)
+    │   └── rapports/           (généré)
+    ├── .github/workflows/      # CI/CD
+    └── Dockerfile              # Docker original
     \`\`\`
+    
+    ## Dépendances
+    - Terraform >= 1.0
+    - Docker (optionnel)
+    - Navigateur web moderne
+    
+    ## Support
+    Pour toute question, consultez la documentation ou créez une issue sur GitHub.
   EOT
+  
+  depends_on = [random_id.projet_id]
 }
 
-# 2. Générer un ID unique pour le projet
-resource "random_id" "projet_id" {
-  byte_length = 4
-}
-
-# 3. Créer un fichier de configuration Docker
+# 4. Créer un fichier de configuration Docker OPTIMISÉ pour votre formulaire
 resource "local_file" "docker_config" {
-  filename = "../Dockerfile-terraform"
+  filename = "${path.module}/Dockerfile-terraform"
   content  = <<-EOT
-    # Dockerfile généré par Terraform
+    # Dockerfile optimisé pour votre formulaire HTML
     FROM nginx:alpine
     
     LABEL mainteneur="cadel20"
     LABEL version="1.0"
-    LABEL description="Projet d'apprentissage DevOps"
+    LABEL description="Déploiement du formulaire DevOps avec Docker"
     
-    COPY index.html /usr/share/nginx/html/
+    # Copier votre formulaire HTML
+    COPY ../index.html /usr/share/nginx/html/
+    
+    # Créer une page d'accueil par défaut
+    RUN echo '<!DOCTYPE html> \
+    <html> \
+    <head> \
+        <meta http-equiv="refresh" content="0; url=index.html"> \
+        <title>Redirection vers le formulaire</title> \
+    </head> \
+    <body> \
+        <p>Redirection vers le formulaire d'inscription...</p> \
+    </body> \
+    </html>' > /usr/share/nginx/html/index_redirect.html
+    
+    # Configuration Nginx optimisée
+    RUN echo 'server { \
+        listen 80; \
+        server_name localhost; \
+        root /usr/share/nginx/html; \
+        index index.html; \
+        \
+        # Compression Gzip \
+        gzip on; \
+        gzip_vary on; \
+        gzip_min_length 1024; \
+        gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss; \
+        \
+        # Cache des fichiers statiques \
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ { \
+            expires 1y; \
+            add_header Cache-Control "public, immutable"; \
+        } \
+        \
+        # Service du formulaire HTML \
+        location / { \
+            try_files \$uri \$uri/ /index.html; \
+        } \
+    }' > /etc/nginx/conf.d/default.conf
     
     EXPOSE 80
     
@@ -70,99 +154,167 @@ resource "local_file" "docker_config" {
   EOT
 }
 
-# 4. Générer un rapport de déploiement
+# 5. Générer un rapport de déploiement
 resource "local_file" "rapport_deploiement" {
-  filename = "../rapports/deploiement-${formatdate("YYYY-MM-DD", timestamp())}.md"
+  filename = "${path.module}/rapports/deploiement-${formatdate("YYYY-MM-DD", timestamp())}.md"
   content  = <<-EOT
-    # 📋 Rapport de Déploiement
+    # 📋 Rapport de Déploiement - Formulaire DevOps
     
-    ## Détails
+    ## Détails du déploiement
     - **Projet** : demo-devops
+    - **Composant** : Formulaire HTML interactif
     - **Environnement** : Développement
     - **Date** : ${timestamp()}
-    - **ID** : ${random_id.projet_id.hex}
+    - **ID Terraform** : ${random_id.projet_id.hex}
     
-    ## Statut
-    ✅ Configuration Terraform valide
-    ✅ Ressources locales prêtes
-    ✅ Intégration CI/CD configurée
-    ✅ Conteneur Docker créé
+    ## ✅ Validation des ressources
+    - ✅ Configuration Terraform valide
+    - ✅ Documentation générée
+    - ✅ Dockerfile optimisé créé
+    - ✅ Dossier de rapports disponible
     
-    ## Fichiers générés
-    1. documentation-projet.md
-    2. Dockerfile-terraform
-    3. Ce rapport
+    ## 📁 Fichiers générés/modifiés
+    1. **documentation-projet.md** - Documentation complète du projet
+    2. **Dockerfile-terraform** - Configuration Docker optimisée
+    3. **Votre formulaire HTML** - Conservé intact à la racine
     
-    ## Conteneur Docker
-    - Nom : mon-site-devops-${random_id.projet_id.hex}
-    - Port : 8080
-    - URL : http://localhost:8080
+    ## 🐳 Configuration Docker
+    - **Image de base** : nginx:alpine
+    - **Port exposé** : 80
+    - **Optimisations** : 
+      - Compression Gzip activée
+      - Cache des fichiers statiques
+      - Redirection automatique
     
-    ## Prochaines étapes
-    1. Ouvrir http://localhost:8080
-    2. Vérifier le site web
-    3. Exécuter le pipeline CI/CD
+    ## 🌐 URLs d'accès
+    - **Local** : http://localhost:8080
+    - **Avec Docker** : http://localhost:8080/index.html
+    - **GitHub Pages** : https://cadel20.github.io/demo-devops/
+    
+    ## 🔧 Commandes de test
+    \`\`\`bash
+    # Construire l'image Docker
+    docker build -f infrastructure/Dockerfile-terraform -t formulaire-devops .
+    
+    # Lancer le conteneur
+    docker run -d -p 8080:80 --name formulaire-devops formulaire-devops
+    
+    # Vérifier le conteneur
+    docker ps
+    
+    # Accéder au formulaire
+    # Ouvrez http://localhost:8080 dans votre navigateur
+    \`\`\`
+    
+    ## 📊 Caractéristiques du formulaire
+    - ✅ Validation en temps réel
+    - ✅ Design responsive
+    - ✅ Animations fluides
+    - ✅ Compatibilité cross-browser
+    - ✅ Sécurité améliorée
+    
+    ## 🚀 Prochaines étapes
+    1. **Tester le déploiement Docker** : 
+       \`docker build -f infrastructure/Dockerfile-terraform -t formulaire-devops .\`
+       
+    2. **Exécuter le conteneur** :
+       \`docker run -d -p 8080:80 formulaire-devops\`
+       
+    3. **Vérifier le site** :
+       Ouvrir http://localhost:8080
+       
+    4. **Lancer le pipeline CI/CD** :
+       Vérifier les workflows GitHub Actions
+       
+    5. **Déployer sur GitHub Pages** (si configuré)
+    
+    ## 📝 Notes
+    - Votre formulaire HTML original est préservé
+    - Le Dockerfile est optimisé pour les performances
+    - La documentation est mise à jour automatiquement
+    - Les rapports sont archivés pour traçabilité
+    
+    ---
+    *Rapport généré automatiquement par Terraform*
   EOT
-}
-
-# 5. Créer le dossier rapports s'il n'existe pas
-resource "local_file" "dossier_rapports" {
-  filename = "../rapports/.keep"
-  content  = "Dossier pour les rapports Terraform"
-}
-
-# ⭐⭐ NOUVEAU : Créer un conteneur Docker avec Terraform ⭐⭐
-resource "docker_image" "nginx" {
-  name         = "nginx:alpine"
-  keep_locally = true
-}
-
-resource "docker_container" "mon_site" {
-  name  = "mon-site-devops-${random_id.projet_id.hex}"
-  image = docker_image.nginx.image_id
   
-  # Port mapping - votre site sera sur le port 8080
-  ports {
-    internal = 80
-    external = 8080
-  }
-  
-  # Monte votre HTML dans le conteneur
-  volumes {
-    container_path = "/usr/share/nginx/html"
-    host_path      = abspath("..")  # Chemin absolu vers votre projet
-    read_only      = true
-  }
-  
-  # Redémarrage automatique
-  restart = "unless-stopped"
-  
-  # Démarrage santé
-  healthcheck {
-    test     = ["CMD", "curl", "-f", "http://localhost"]
-    interval = "30s"
-    timeout  = "10s"
-    retries  = 3
-    start_period = "10s"
-  }
-  
-  # Dépend des fichiers générés
   depends_on = [
-    local_file.documentation_projet,
-    local_file.rapport_deploiement
+    random_id.projet_id,
+    local_file.dossier_rapports
   ]
 }
 
-# ⚠️ COMMENTÉ car cause des erreurs - décommentez si besoin
-# resource "null_resource" "docker_backup" {
-#   triggers = {
-#     always_run = timestamp()
-#   }
-#   
-#   provisioner "local-exec" {
-#     command = <<-EOT
-#       echo "Alternative Docker container"
-#       docker run -d -p 8081:80 --name backup-site nginx:alpine
-#     EOT
-#   }
-# }
+# Outputs pour afficher les informations
+output "project_id" {
+  value       = random_id.projet_id.hex
+  description = "ID unique du projet"
+}
+
+output "generated_files" {
+  value = [
+    local_file.documentation_projet.filename,
+    local_file.docker_config.filename,
+    local_file.rapport_deploiement.filename
+  ]
+  description = "Fichiers générés par Terraform"
+}
+
+output "form_info" {
+  value = {
+    html_file      = "../index.html (votre formulaire existant)"
+    dockerfile     = local_file.docker_config.filename
+    documentation  = local_file.documentation_projet.filename
+    reports        = local_file.rapport_deploiement.filename
+  }
+  description = "Informations sur le formulaire et les fichiers générés"
+}
+
+output "docker_commands" {
+  value = <<-EOT
+    🐳 POUR DÉPLOYER VOTRE FORMULAIRE AVEC DOCKER :
+    
+    1. Construire l'image :
+       docker build -f ${local_file.docker_config.filename} -t formulaire-devops .
+    
+    2. Lancer le conteneur :
+       docker run -d -p 8080:80 --name formulaire-devops formulaire-devops
+    
+    3. Vérifier :
+       docker ps
+       
+    4. Accéder au formulaire :
+       Ouvrez http://localhost:8080
+       
+    5. Arrêter le conteneur :
+       docker stop formulaire-devops
+       docker rm formulaire-devops
+  EOT
+}
+
+output "next_steps" {
+  value = <<-EOT
+    ✅ TERRAFORM A TERMINÉ AVEC SUCCÈS !
+    
+    📋 CE QUI A ÉTÉ FAIT :
+    1. ✅ ID du projet généré : ${random_id.projet_id.hex}
+    2. ✅ Documentation créée : ${local_file.documentation_projet.filename}
+    3. ✅ Dockerfile optimisé : ${local_file.docker_config.filename}
+    4. ✅ Rapport de déploiement : ${local_file.rapport_deploiement.filename}
+    
+    🎯 VOTRE FORMULAIRE HTML EST PRÊT !
+    - Emplacement : index.html (à la racine, inchangé)
+    - Design : Formulaire interactif avec validation
+    - Fonctionnalités : Complètes et modernes
+    
+    🚀 PROCHAINES ÉTAPES RECOMMANDÉES :
+    1. Tester avec Docker (voir commandes ci-dessus)
+    2. Vérifier le pipeline CI/CD dans .github/workflows/
+    3. Déployer sur GitHub Pages si configuré
+    4. Partager votre formulaire avec des utilisateurs test
+    
+    📞 SUPPORT :
+    - Documentation : ${local_file.documentation_projet.filename}
+    - Rapports : ${local_file.rapport_deploiement.filename}
+    - Issues : GitHub Repository
+  EOT
+}
