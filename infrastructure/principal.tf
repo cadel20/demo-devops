@@ -1,317 +1,303 @@
-# Version TESTÉE pour créer l'image Docker avec Terraform
+# terraform-docker-hub.tf
+# Version pour créer l'image et pousser sur Docker Hub
 
 # 1. Générer un ID unique pour le projet
 resource "random_id" "projet_id" {
   byte_length = 4
 }
 
-# 2. SOLUTION : Supprimer la création de dossier problématique
-# OU utiliser une approche différente
-
-# 3. Créer la documentation
-resource "local_file" "documentation_projet" {
-  filename = "documentation-projet.md"
-  content  = <<-EOT
-    # Documentation du Projet
-    ID: ${random_id.projet_id.hex}
-    Date: ${timestamp()}
-    
-    Image Docker créée: formulaire-devops
-    Port: 8080
-    URL: http://localhost:8080
-  EOT
+# 2. Variables pour Docker Hub
+variable "dockerhub_username" {
+  description = "Votre nom d'utilisateur Docker Hub"
+  type        = string
+  sensitive   = true
 }
 
-# 4. Créer le Dockerfile - VERSION SIMPLIFIÉE
-resource "local_file" "docker_config" {
-  filename = "Dockerfile-terraform"
+variable "dockerhub_token" {
+  description = "Votre token d'accès Docker Hub"
+  type        = string
+  sensitive   = true
+}
+
+# 3. Créer le Dockerfile optimisé
+resource "local_file" "dockerfile_complet" {
+  filename = "Dockerfile"
   content  = <<-EOT
-# Dockerfile généré par Terraform
+# Multi-stage build pour une image plus petite
+FROM node:18-alpine as builder
+
+WORKDIR /app
+
+# Copier les fichiers package
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Copier le code source
+COPY . .
+
+# Stage final
 FROM nginx:alpine
 
-# Créer une page HTML de test si index.html n'existe pas
-RUN echo '<!DOCTYPE html><html><head><title>Test Terraform Docker</title></head><body><h1>✅ Docker fonctionne via Terraform!</h1><p>ID: ${random_id.projet_id.hex}</p></body></html>' > /usr/share/nginx/html/index.html
+# Copier les fichiers statiques
+COPY --from=builder /app /usr/share/nginx/html
+COPY index.html /usr/share/nginx/html/
 
-# Copier votre index.html S'IL EXISTE
-COPY index.html /usr/share/nginx/html/ 2>/dev/null || true
+# Configuration Nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Santé check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
   EOT
 }
 
-# 5. CRÉER L'IMAGE DOCKER - VERSION AMÉLIORÉE
-resource "null_resource" "build_docker_image" {
-  triggers = {
-    always_run = timestamp()
-  }
-  
-  provisioner "local-exec" {
-    command = <<-EOT
-      @echo off
-      echo ========================================
-      echo 🐳 CONSTRUCTION IMAGE DOCKER VIA TERRAFORM
-      echo ========================================
-      
-      REM Vérifier si Docker Desktop est démarré
-      docker version >nul 2>&1
-      if errorlevel 1 (
-        echo ❌ ERREUR: Docker Desktop n'est pas démarré
-        echo 💡 Démarrez Docker Desktop et réessayez
-        exit /b 1
-      )
-      
-      echo ✅ Docker Desktop est operationnel
-      
-      REM Aller au dossier parent (où devrait être index.html)
-      cd /d "%~dp0.."
-      echo 📁 Dossier de travail: %CD%
-      
-      REM Vérifier si index.html existe
-      if exist index.html (
-        echo ✅ Fichier index.html trouve
-        type index.html | findstr "<html" >nul && echo ✅ HTML valide detecte
-      ) else (
-        echo ⚠️  index.html non trouve, utilisation du HTML par defaut
-      )
-      
-      REM Construire l'image Docker
-      echo 📦 Construction de l'image: formulaire-devops...
-      docker build -f infrastructure/Dockerfile-terraform -t formulaire-devops .
-      
-      if errorlevel 1 (
-        echo ❌ ERREUR lors de la construction Docker
-        echo 💡 Verifiez: docker --version et Docker Desktop
-        exit /b 1
-      )
-      
-      echo ✅ ✅ IMAGE DOCKER CRÉÉE AVEC SUCCÈS!
-      echo.
-      docker images formulaire-devops
-      echo.
-      echo 📋 Tag supplementaire...
-      docker tag formulaire-devops formulaire-devops:latest
-      
-      REM Sauvegarder les infos
-      echo Image: formulaire-devops > infrastructure\docker-success.txt
-      echo Date: %date% %time% >> infrastructure\docker-success.txt
-      echo Port: 8080 >> infrastructure\docker-success.txt
-    EOT
-    
-    interpreter = ["cmd", "/c"]
-  }
-  
-  depends_on = [local_file.docker_config]
-}
-
-# 6. LANCER LE CONTENEUR DOCKER - VERSION AMÉLIORÉE
-resource "null_resource" "run_docker_container" {
-  triggers = {
-    always_run = timestamp()
-  }
-  
-  provisioner "local-exec" {
-    command = <<-EOT
-      @echo off
-      echo ========================================
-      echo 🚀 LANCEMENT CONTENEUR DOCKER
-      echo ========================================
-      
-      REM Arrêter l'ancien conteneur si existe
-      echo 🔄 Nettoyage des anciens conteneurs...
-      docker stop formulaire-devops 2>nul
-      docker rm formulaire-devops 2>nul
-      
-      REM Lancer le nouveau conteneur
-      echo ▶️  Lancement sur le port 8080...
-      docker run -d -p 8080:80 --name formulaire-devops formulaire-devops
-      
-      if errorlevel 1 (
-        echo ❌ ERREUR: Impossible de lancer le conteneur
-        echo 💡 Verifiez: docker images formulaire-devops
-        exit /b 1
-      )
-      
-      echo ✅ CONTENEUR DÉMARRÉ!
-      
-      REM Attendre que Nginx démarre
-      timeout /t 5 /nobreak >nul
-      
-      REM Vérifier le statut
-      echo 📊 Statut du conteneur:
-      docker ps --filter "name=formulaire-devops" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-      
-      REM Tester l'accès
-      echo.
-      echo 🌐 TEST D'ACCÈS AU SITE...
-      curl --max-time 10 http://localhost:8080 >nul 2>&1
-      if errorlevel 1 (
-        echo ⚠️  Le site met du temps à répondre
-      ) else (
-        echo ✅ Site accessible!
-      )
-      
-      echo.
-      echo ========================================
-      echo 🌐 SITE DISPONIBLE: http://localhost:8080
-      echo ========================================
-      echo.
-      echo 📋 Commandes utiles:
-      echo   docker logs formulaire-devops
-      echo   docker exec -it formulaire-devops sh
-      echo   docker stop formulaire-devops
-      echo.
-      echo 💡 Ouvrez: http://localhost:8080 dans votre navigateur
-    EOT
-    
-    interpreter = ["cmd", "/c"]
-  }
-  
-  depends_on = [null_resource.build_docker_image]
-}
-
-# 7. Créer un rapport SIMPLE (sans dossier rapports)
-resource "local_file" "rapport_deploiement" {
-  filename = "deploiement-docker-${formatdate("YYYY-MM-DD-HH-mm", timestamp())}.md"
+# 4. Créer la configuration nginx
+resource "local_file" "nginx_config" {
+  filename = "nginx.conf"
   content  = <<-EOT
-    # Rapport de Déploiement Docker
+server {
+    listen 80;
+    server_name localhost;
     
-    ## ✅ DÉPLOIEMENT TERRAFORM + DOCKER
-    **Date**: ${timestamp()}
-    **ID Projet**: ${random_id.projet_id.hex}
+    root /usr/share/nginx/html;
+    index index.html;
     
-    ## 📊 RÉSULTATS
-    - ✅ Image Docker créée: `formulaire-devops`
-    - ✅ Conteneur lancé: `formulaire-devops`
-    - ✅ Port exposé: 8080 → 80
-    - ✅ URL: http://localhost:8080
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
     
-    ## 🐳 COMMANDES DOCKER
-    \`\`\`bash
-    # Vérifier l'image
-    docker images formulaire-devops
+    # Cache static assets
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
     
-    # Vérifier le conteneur
-    docker ps --filter "name=formulaire-devops"
-    
-    # Voir les logs
-    docker logs formulaire-devops
-    
-    # Arrêter
-    docker stop formulaire-devops
-    
-    # Shell dans le conteneur
-    docker exec -it formulaire-devops sh
-    \`\`\`
-    
-    ## 🔍 VÉRIFICATION
-    1. Ouvrez http://localhost:8080
-    2. Vérifiez avec: \`curl http://localhost:8080\`
-    3. Consultez les logs: \`docker logs formulaire-devops\`
-    
-    ## 📝 NOTES
-    - Image construite via Terraform
-    - Docker Desktop requis
-    - Nginx comme serveur web
-    - HTML servi depuis /usr/share/nginx/html/
-    
-    ---
-    *Généré automatiquement par Terraform*
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+}
   EOT
+}
+
+# 5. BUILD de l'image Docker localement
+resource "null_resource" "docker_build_local" {
+  triggers = {
+    dockerfile_hash = md5(file("${path.module}/Dockerfile"))
+    timestamp       = timestamp()
+  }
   
-  depends_on = [null_resource.run_docker_container]
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "🐳 Construction de l'image Docker localement..."
+      
+      # Construire l'image
+      docker build -t formulaire-devops:local -t ${var.dockerhub_username}/formulaire-devops:latest .
+      
+      # Tagger pour Docker Hub
+      docker tag formulaire-devops:local ${var.dockerhub_username}/formulaire-devops:${random_id.projet_id.hex}
+      docker tag formulaire-devops:local ${var.dockerhub_username}/formulaire-devops:latest
+      
+      echo "✅ Image taggée pour Docker Hub: ${var.dockerhub_username}/formulaire-devops"
+    EOT
+  }
+  
+  depends_on = [local_file.dockerfile_complet, local_file.nginx_config]
 }
 
-# Outputs DÉTAILLÉS
-output "id_projet" {
-  value = random_id.projet_id.hex
-  description = "ID unique du projet"
+# 6. LOGIN à Docker Hub et PUSH
+resource "null_resource" "docker_push_to_hub" {
+  triggers = {
+    image_id = random_id.projet_id.hex
+  }
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "🔐 Connexion à Docker Hub..."
+      
+      # Login avec token
+      echo "${var.dockerhub_token}" | docker login -u "${var.dockerhub_username}" --password-stdin
+      
+      if [ $? -eq 0 ]; then
+        echo "✅ Connecté à Docker Hub en tant que ${var.dockerhub_username}"
+        
+        # Pousser l'image
+        echo "📤 Envoi de l'image vers Docker Hub..."
+        docker push ${var.dockerhub_username}/formulaire-devops:latest
+        docker push ${var.dockerhub_username}/formulaire-devops:${random_id.projet_id.hex}
+        
+        echo "🎉 Image poussée avec succès!"
+        echo "📦 Tags disponibles:"
+        echo "   - ${var.dockerhub_username}/formulaire-devops:latest"
+        echo "   - ${var.dockerhub_username}/formulaire-devops:${random_id.projet_id.hex}"
+      else
+        echo "❌ Échec de la connexion à Docker Hub"
+        echo "💡 Vérifiez votre token dans les secrets GitHub"
+      fi
+    EOT
+    
+    interpreter = ["bash", "-c"]
+  }
+  
+  depends_on = [null_resource.docker_build_local]
 }
 
-output "site_url" {
-  value = "http://localhost:8080"
-  description = "URL d'accès au site"
-}
+# 7. Script de déploiement Docker Desktop
+resource "local_file" "deploy_docker_desktop" {
+  filename = "deploy-docker-desktop.sh"
+  content  = <<-EOT
+#!/bin/bash
 
-output "docker_verification" {
-  value = <<-EOT
-    =========================================
-    ✅ VÉRIFICATION DOCKER - EXÉCUTEZ CES COMMANDES:
-    =========================================
-    
-    1. VÉRIFIEZ L'IMAGE:
-       docker images | findstr formulaire-devops
-    
-    2. VÉRIFIEZ LE CONTENEUR:
-       docker ps | findstr formulaire-devops
-    
-    3. TESTEZ LE SITE:
-       curl http://localhost:8080
-       OU
-       start http://localhost:8080
-    
-    4. VOYEZ LES LOGS:
-       docker logs formulaire-devops
-    
-    5. SI PROBLÈME:
-       - Vérifiez Docker Desktop est démarré
-       - Vérifiez le port 8080 n'est pas utilisé
-       - Redémarrez: docker restart formulaire-devops
-    
-    =========================================
-    🌐 ACCÈS: http://localhost:8080
-    =========================================
+echo "🚀 Déploiement sur Docker Desktop..."
+
+# Arrêter et supprimer l'ancien conteneur
+docker stop formulaire-devops 2>/dev/null || true
+docker rm formulaire-devops 2>/dev/null || true
+
+# Lancer le nouveau conteneur depuis Docker Hub
+echo "📥 Téléchargement depuis Docker Hub..."
+docker pull ${var.dockerhub_username}/formulaire-devops:latest
+
+echo "▶️  Lancement du conteneur..."
+docker run -d \
+  -p 8080:80 \
+  -p 8443:443 \
+  --name formulaire-devops \
+  --restart unless-stopped \
+  ${var.dockerhub_username}/formulaire-devops:latest
+
+echo "⏳ Attente du démarrage..."
+sleep 5
+
+# Vérifier le statut
+echo "📊 Statut:"
+docker ps --filter "name=formulaire-devops" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+echo ""
+echo "✅ DÉPLOIEMENT TERMINÉ!"
+echo "🌐 Accédez à: http://localhost:8080"
+echo "📦 Image Docker Hub: ${var.dockerhub_username}/formulaire-devops"
   EOT
 }
 
-output "docker_status" {
-  value = <<-EOT
-    🐳 STATUT DOCKER:
-    
-    Si les commandes ci-dessus ne montrent rien:
-    
-    1. Vérifiez Docker Desktop:
-       - Icône Docker dans la barre des tâches
-       - "Docker Desktop is running" devrait s'afficher
-    
-    2. Testez Docker manuellement:
-       docker --version
-       docker run hello-world
-    
-    3. Construisez manuellement:
-       cd ..
-       docker build -f infrastructure/Dockerfile-terraform -t test-image .
-       docker run -d -p 8081:80 --name test-container test-image
-    
-    4. Problèmes courants:
-       - Port 8080 déjà utilisé
-       - Docker Desktop pas démarré
-       - Windows pas en mode Linux containers
-       - Mémoire insuffisante dans Docker
+# 8. Documentation complète
+resource "local_file" "documentation_complete" {
+  filename = "DEPLOYMENT_GUIDE.md"
+  content  = <<-EOT
+# Guide de Déploiement Docker Hub + GitHub
+
+## 📋 PRÉREQUIS
+1. Compte Docker Hub: https://hub.docker.com
+2. Token Docker Hub (Classic) avec droits d'écriture
+3. Docker Desktop installé et démarré
+4. Terraform installé
+
+## 🔧 CONFIGURATION
+
+### 1. Créer les secrets GitHub (Settings > Secrets and variables > Actions):
+- `DOCKERHUB_USERNAME` : Votre nom d'utilisateur Docker Hub
+- `DOCKERHUB_TOKEN` : Votre token d'accès
+
+### 2. Configurer Terraform:
+\`\`\`bash
+# Initialiser Terraform
+terraform init
+
+# Appliquer avec vos credentials
+terraform apply -var="dockerhub_username=VOTRE_NOM" -var="dockerhub_token=VOTRE_TOKEN"
+\`\`\`
+
+## 🐳 COMMANDES MANUELLES
+
+### Build local:
+\`\`\`bash
+docker build -t formulaire-devops .
+\`\`\`
+
+### Push vers Docker Hub:
+\`\`\`bash
+docker tag formulaire-devops VOTRE_NOM/formulaire-devops:latest
+docker login -u VOTRE_NOM
+docker push VOTRE_NOM/formulaire-devops:latest
+\`\`\`
+
+### Pull et run depuis Docker Hub:
+\`\`\`bash
+docker pull VOTRE_NOM/formulaire-devops:latest
+docker run -d -p 8080:80 --name formulaire-devops VOTRE_NOM/formulaire-devops:latest
+\`\`\`
+
+## 🔗 LIENS UTILES
+- **Docker Hub Repository**: https://hub.docker.com/r/${var.dockerhub_username}/formulaire-devops
+- **GitHub Actions**: https://github.com/${var.github_repo}/actions
+- **Site local**: http://localhost:8080
+
+## 📊 VÉRIFICATION
+\`\`\`bash
+# Vérifier l'image sur Docker Hub
+docker pull ${var.dockerhub_username}/formulaire-devops:latest
+
+# Vérifier le conteneur
+docker ps --filter "name=formulaire-devops"
+
+# Voir les logs
+docker logs formulaire-devops
+\`\`\`
   EOT
 }
 
-# Output pour diagnostiquer
-output "diagnostic" {
+# 9. Fichier .env example
+resource "local_file" "env_example" {
+  filename = ".env.example"
+  content  = <<-EOT
+# Configuration Docker Hub
+DOCKERHUB_USERNAME=votre_nom_dockerhub
+DOCKERHUB_TOKEN=votre_token_ici
+
+# Configuration application
+APP_PORT=8080
+APP_NAME=formulaire-devops
+APP_VERSION=1.0.0
+  EOT
+}
+
+# Outputs
+output "dockerhub_repository" {
+  value = "https://hub.docker.com/r/${var.dockerhub_username}/formulaire-devops"
+  description = "URL du repository Docker Hub"
+}
+
+output "local_deployment" {
   value = <<-EOT
-    🔧 DIAGNOSTIC TERRAFORM DOCKER:
+  🚀 DÉPLOIEMENT LOCAL:
+  
+  1. Image construite: formulaire-devops:local
+  2. Image poussée: ${var.dockerhub_username}/formulaire-devops
+  
+  Commandes:
+    docker run -d -p 8080:80 --name formulaire-devops formulaire-devops:local
+    OU
+    docker run -d -p 8080:80 --name formulaire-devops ${var.dockerhub_username}/formulaire-devops:latest
     
-    Étapes effectuées:
-    1. ✅ Dockerfile créé: Dockerfile-terraform
-    2. ✅ Commande docker build exécutée
-    3. ✅ Commande docker run exécutée
-    
-    Si Docker ne montre rien:
-    - Exécutez manuellement dans PowerShell:
-    
-    cd ..
-    docker images
-    docker ps -a
-    
-    - Cherchez "formulaire-devops" dans la liste
-    - Si absent, Docker Desktop avait un problème pendant l'exécution
-    
-    Solution: Redémarrez Docker Desktop et exécutez:
-    terraform apply -replace="null_resource.build_docker_image"
+  Accès: http://localhost:8080
+  EOT
+}
+
+output "github_actions_setup" {
+  value = <<-EOT
+  ⚙️  CONFIGURATION GITHUB ACTIONS:
+  
+  1. Allez dans: Settings > Secrets and variables > Actions
+  2. Ajoutez ces secrets:
+     - DOCKERHUB_USERNAME: ${var.dockerhub_username}
+     - DOCKERHUB_TOKEN: [votre token]
+  
+  3. Poussez sur main pour déclencher le workflow
+  4. Vérifiez: https://github.com/[votre-repo]/actions
   EOT
 }
