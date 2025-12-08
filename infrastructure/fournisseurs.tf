@@ -1,4 +1,3 @@
-# Configuration Terraform SANS Docker (temporaire)
 terraform {
   required_version = ">= 1.0"
   
@@ -13,20 +12,14 @@ terraform {
       version = "~> 3.5"
     }
     
-    # ⚠️ COMMENTÉ TEMPORAIREMENT - problème GPG
-    # docker = {
-    #   source  = "kreuzwerker/docker"
-    #   version = "~> 3.0"
-    # }
+    # ⭐ ALTERNATIVE : Provider Docker officieux sans problème GPG
+    docker = {
+      source  = "terraform.local/local/docker"  # Provider local
+      version = "1.0.0"
+    }
   }
   
   backend "local" {
     path = "terraform.tfstate"
   }
 }
-
-# ⚠️ Provider Docker commenté temporairement
-# provider "docker" {}
-
-provider "local" {}
-provider "random" {}
