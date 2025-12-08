@@ -1,23 +1,34 @@
-# Configuration Terraform
+# Configuration Terraform avec Docker
 terraform {
   required_version = ">= 1.0"
   
   required_providers {
-    # Pour les ressources locales
     local = {
       source  = "hashicorp/local"
       version = "~> 2.4"
     }
     
-    # Pour générer des données aléatoires
     random = {
       source  = "hashicorp/random"
       version = "~> 3.5"
     }
+    
+    docker = {
+      source  = "kreuzwerker/docker"
+      version = "~> 3.0"
+    }
   }
   
-  # Configuration du backend (état) - Local
   backend "local" {
     path = "terraform.tfstate"
   }
 }
+
+# Provider Docker avec détection automatique du système
+provider "docker" {
+  # Détection automatique pour Windows/Linux/Mac
+  # Terraform choisira le bon host selon votre OS
+}
+
+provider "local" {}
+provider "random" {}

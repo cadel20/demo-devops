@@ -21,6 +21,7 @@ resource "local_file" "documentation_projet" {
     
     ## URL du site
     - GitHub Pages : https://cadel20.github.io/demo-devops/
+    - Docker local : http://localhost:8080
     
     ## Commandes utiles
     \`\`\`bash
@@ -85,16 +86,22 @@ resource "local_file" "rapport_deploiement" {
     ✅ Configuration Terraform valide
     ✅ Ressources locales prêtes
     ✅ Intégration CI/CD configurée
+    ✅ Conteneur Docker créé
     
     ## Fichiers générés
     1. documentation-projet.md
     2. Dockerfile-terraform
     3. Ce rapport
     
+    ## Conteneur Docker
+    - Nom : mon-site-devops-${random_id.projet_id.hex}
+    - Port : 8080
+    - URL : http://localhost:8080
+    
     ## Prochaines étapes
-    1. Exécuter le pipeline CI/CD
-    2. Vérifier le déploiement
-    3. Tester le site web
+    1. Ouvrir http://localhost:8080
+    2. Vérifier le site web
+    3. Exécuter le pipeline CI/CD
   EOT
 }
 
@@ -102,4 +109,77 @@ resource "local_file" "rapport_deploiement" {
 resource "local_file" "dossier_rapports" {
   filename = "../rapports/.keep"
   content  = "Dossier pour les rapports Terraform"
+}
+
+# ⭐⭐ NOUVEAU : Créer un conteneur Docker avec Terraform ⭐⭐
+resource "docker_image" "nginx" {
+  name         = "nginx:alpine"
+  keep_locally = true
+}
+
+resource "docker_container" "mon_site" {
+  name  = "mon-site-devops-${random_id.projet_id.hex}"
+  image = docker_image.nginx.image_id
+  
+  # Port mapping - votre site sera sur le port 8080
+  ports {
+    internal = 80
+    external = 8080
+  }
+  
+  # Monte votre HTML dans le conteneur
+  volumes {
+    container_path = "/usr/share/nginx/html"
+    host_path      = abspath("..")  # Chemin absolu vers votre projet
+    read_only      = true
+  }
+  
+  # Redémarrage automatique
+  restart = "unless-stopped"
+  
+  # Démarrage santé
+  healthcheck {
+    test     = ["CMD", "curl", "-f", "http://localhost"]
+    interval = "30s"
+    timeout  = "10s"
+    retries  = 3
+    start_period = "10s"
+  }
+  
+  # Dépend des fichiers générés
+  depends_on = [
+    local_file.documentation_projet,
+    local_file.rapport_deploiement
+  ]
+}
+
+# Alternative si le provider Docker pose problème
+resource "null_resource" "docker_backup" {
+  triggers = {
+    always_run = timestamp()
+  }
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "🐳 Lancement du conteneur Docker via Terraform..."
+      docker run -d \
+        --name mon-site-backup-${random_id.projet_id.hex} \
+        -p 8081:80 \
+        -v ${abspath("..")}/index.html:/usr/share/nginx/html/index.html:ro \
+        nginx:alpine
+      echo "✅ Conteneur lancé sur http://localhost:8081"
+    EOT
+    
+    interpreter = ["PowerShell", "-Command"]
+  }
+  
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<-EOT
+      docker stop mon-site-backup-${random_id.projet_id.hex} 2>$null
+      docker rm mon-site-backup-${random_id.projet_id.hex} 2>$null
+    EOT
+    
+    interpreter = ["PowerShell", "-Command"]
+  }
 }
