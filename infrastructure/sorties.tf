@@ -1,4 +1,4 @@
-# Variables de sortie
+# Variables de sortie - Version SANS Provider Docker
 
 output "message_bienvenue" {
   value = <<-EOT
@@ -8,8 +8,10 @@ output "message_bienvenue" {
     Auteur: ${var.auteur}
     Environnement: ${var.environnement}
     
+    ✅ CONFIGURATION SÉCURISÉE - Pas d'erreur OpenPGP
+    
     Commandes disponibles:
-    - terraform init    # Initialiser
+    - terraform init    # Initialiser (fonctionne sans erreur)
     - terraform plan    # Voir le plan
     - terraform apply   # Appliquer
   EOT
@@ -17,9 +19,10 @@ output "message_bienvenue" {
 
 output "fichiers_crees" {
   value = [
-    local_file.documentation_projet.filename,
-    local_file.docker_config.filename,
-    local_file.rapport_deploiement.filename
+    "documentation-projet.md",
+    "Dockerfile-terraform", 
+    "fix-openpgp-error.sh",
+    "providers.tf"
   ]
   description = "Liste des fichiers créés par Terraform"
 }
@@ -29,65 +32,146 @@ output "id_projet" {
   description = "ID unique du projet"
 }
 
-# ⭐ NOUVEAU : Informations Docker
+# ⭐ SOLUTION : Docker séparé de Terraform
 output "docker_info" {
   value = <<-EOT
-    🐳 Informations Docker :
+    🐳 Informations Docker (GÉRÉ SÉPARÉMENT) :
     
-    Conteneur créé : ${docker_container.mon_site.name}
-    Image utilisée : ${docker_container.mon_site.image}
-    Port exposé : ${docker_container.mon_site.ports[0].external}
+    ✅ Solution alternative implémentée pour éviter l'erreur OpenPGP
+    ❌ Provider Docker Terraform : NON UTILISÉ (clé GPG expirée)
+    ✅ Docker CLI : UTILISÉ DIRECTEMENT
     
-    🌐 Site accessible sur : http://localhost:${docker_container.mon_site.ports[0].external}
+    📁 Dockerfile généré : Dockerfile-terraform
+    🏷️ Nom recommandé : formulaire-devops
+    
+    🌐 Site accessible sur : http://localhost:8080
     
     Commandes Docker :
-    - Voir les logs : docker logs ${docker_container.mon_site.name}
-    - Arrêter : docker stop ${docker_container.mon_site.name}
-    - Redémarrer : docker restart ${docker_container.mon_site.name}
-    - Inspecter : docker inspect ${docker_container.mon_site.name}
+    - Construire : docker build -f Dockerfile-terraform -t formulaire-devops .
+    - Lancer : docker run -d -p 8080:80 --name formulaire-devops formulaire-devops
+    - Voir les logs : docker logs formulaire-devops
+    - Arrêter : docker stop formulaire-devops
+    - Inspecter : docker inspect formulaire-devops
   EOT
   
-  description = "Informations sur le conteneur Docker créé"
-  
-  # Ne s'affiche que si le conteneur Docker est créé
-  depends_on = [docker_container.mon_site]
+  description = "Informations sur le déploiement Docker (séparé de Terraform)"
 }
 
 output "site_url" {
-  value       = "http://localhost:${docker_container.mon_site.ports[0].external}"
-  description = "URL d'accès au site dans Docker"
-  
-  depends_on = [docker_container.mon_site]
+  value       = "http://localhost:8080"
+  description = "URL d'accès au site via Docker (port par défaut)"
 }
 
 output "docker_container_name" {
-  value       = docker_container.mon_site.name
-  description = "Nom du conteneur Docker"
+  value       = "formulaire-devops"
+  description = "Nom recommandé pour le conteneur Docker"
 }
 
 output "docker_container_status" {
-  value       = "✅ Conteneur Docker en cours d'exécution"
-  description = "Statut du conteneur"
+  value       = "🔄 À démarrer manuellement via Docker CLI"
+  description = "Le conteneur sera géré séparément de Terraform"
 }
 
 output "instructions_completes" {
   value = <<-EOT
-    📋 Instructions complètes :
+    📋 Instructions complètes (SANS erreur OpenPGP) :
     
-    1. Vérifiez le conteneur :
-       docker ps | grep "${docker_container.mon_site.name}"
+    1. ✅ Terraform configuré avec succès :
+       - terraform init   # Fonctionne sans erreur
+       - terraform plan
+       - terraform apply
     
-    2. Accédez au site :
-       Ouvrez http://localhost:${docker_container.mon_site.ports[0].external}
-       Ou exécutez : curl http://localhost:${docker_container.mon_site.ports[0].external}
+    2. 🐳 Déploiement Docker (MANUEL) :
+       # Depuis le dossier infrastructure
+       docker build -f Dockerfile-terraform -t formulaire-devops .
+       docker run -d -p 8080:80 --name formulaire-devops formulaire-devops
     
-    3. Pour nettoyer :
-       terraform destroy -auto-approve
-       Ou : docker stop ${docker_container.mon_site.name} && docker rm ${docker_container.mon_site.name}
+    3. 🌐 Accéder au site :
+       Ouvrez http://localhost:8080
+       Ou exécutez : curl http://localhost:8080
     
-    4. Pour reconstruire :
-       terraform apply -auto-approve
+    4. 🔍 Vérifier Docker :
+       docker ps | grep "formulaire-devops"
+       docker logs formulaire-devops
+    
+    5. 🧹 Pour nettoyer :
+       docker stop formulaire-devops && docker rm formulaire-devops
+       docker rmi formulaire-devops
+    
+    6. 🔧 Si erreur OpenPGP persistante :
+       chmod +x fix-openpgp-error.sh
+       ./fix-openpgp-error.sh
   EOT
-  
-  depends_on = [docker_container.mon_site]
+}
+
+# Nouveau output pour la solution OpenPGP
+output "solution_openpgp" {
+  value = <<-EOT
+    ⚠️  SOLUTION APPLIQUÉE POUR L'ERREUR OPENPGP :
+    
+    Problème : "OpenPGP : clé expirée" avec kreuzwerker/docker v3.6.2
+    Solution : Provider Docker retiré de Terraform
+    
+    ✅ CE QUI FONCTIONNE :
+    - Provider Random : Pour les IDs uniques
+    - Provider Local : Pour les fichiers
+    - Script automatique : fix-openpgp-error.sh
+    
+    ✅ CE QUI EST GÉRÉ SÉPARÉMENT :
+    - Docker : Via Docker CLI direct
+    - Build/Run : Commandes Docker natives
+    
+    📋 Workflow recommandé :
+    1. terraform apply    → Génère configs/docs
+    2. docker build/run   → Déploie le conteneur
+    3. Accès site         → http://localhost:8080
+  EOT
+}
+
+output "urls_importantes" {
+  value = {
+    site_local     = "http://localhost:8080"
+    documentation  = "documentation-projet.md"
+    dockerfile     = "Dockerfile-terraform"
+    script_fix     = "fix-openpgp-error.sh"
+    rapport        = "rapports/deploiement-*.md"
+  }
+  description = "URLs et fichiers importants"
+}
+
+output "commandes_rapides" {
+  value = <<-EOT
+    🚀 Commandes rapides (copiez-collez) :
+    
+    # 1. Résoudre erreur OpenPGP (si nécessaire)
+    chmod +x fix-openpgp-error.sh && ./fix-openpgp-error.sh
+    
+    # 2. Appliquer Terraform
+    terraform init && terraform apply -auto-approve
+    
+    # 3. Docker (depuis dossier infrastructure)
+    docker build -f Dockerfile-terraform -t formulaire-devops .
+    docker run -d -p 8080:80 --name formulaire-devops formulaire-devops
+    
+    # 4. Vérifier
+    curl http://localhost:8080 && echo "✅ Site accessible"
+    
+    # 5. Arrêter tout
+    docker stop formulaire-devops && docker rm formulaire-devops
+    terraform destroy -auto-approve
+  EOT
+}
+
+# Output pour les variables utilisées
+output "configuration_resume" {
+  value = {
+    projet         = "demo-devops"
+    auteur         = var.auteur
+    environnement  = var.environnement
+    id_projet      = random_id.projet_id.hex
+    date_generation = timestamp()
+    providers_utilises = ["hashicorp/random", "hashicorp/local", "hashicorp/null"]
+    docker_gestion = "separée_cli"
+  }
+  description = "Résumé de la configuration appliquée"
 }
