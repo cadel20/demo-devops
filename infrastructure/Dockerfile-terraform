@@ -1,4 +1,11 @@
+# Dockerfile généré par Terraform
 FROM nginx:alpine
-COPY index.html /usr/share/nginx/html/
+
+# Créer une page HTML de test si index.html n'existe pas
+RUN echo '<!DOCTYPE html><html><head><title>Test Terraform Docker</title></head><body><h1>✅ Docker fonctionne via Terraform!</h1><p>ID: b5cbad97</p></body></html>' > /usr/share/nginx/html/index.html
+
+# Copier votre index.html S'IL EXISTE
+COPY index.html /usr/share/nginx/html/ 2>/dev/null || true
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
