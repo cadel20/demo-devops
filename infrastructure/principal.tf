@@ -1,4 +1,4 @@
-# Version corrigée avec solutions pour l'erreur OpenPGP
+# Version avec création automatique de l'image Docker
 
 # 0. Créer un script de résolution de l'erreur OpenPGP
 resource "local_file" "fix_openpgp_script" {
@@ -251,76 +251,222 @@ resource "local_file" "docker_config" {
   EOT
 }
 
-# 5. Générer un rapport de déploiement
+# 7. NOUVEAU : Créer l'image Docker automatiquement
+resource "null_resource" "build_docker_image" {
+  triggers = {
+    dockerfile_hash = filemd5(local_file.docker_config.filename)
+    timestamp       = timestamp()
+    project_id      = random_id.projet_id.hex
+  }
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      Write-Host "🐳 Construction de l'image Docker..." -ForegroundColor Cyan
+      Write-Host "=====================================" -ForegroundColor Cyan
+      
+      # Variables
+      $IMAGE_NAME = "formulaire-devops"
+      $IMAGE_TAG = "v1.0-${random_id.projet_id.hex}"
+      $PORT = 8080
+      
+      # Vérifier si le fichier index.html existe
+      $indexPath = "..\\index.html"
+      if (-not (Test-Path $indexPath)) {
+          Write-Host "❌ ERREUR: index.html non trouvé à: $indexPath" -ForegroundColor Red
+          Write-Host "   Le fichier doit être dans le dossier parent" -ForegroundColor Yellow
+          exit 1
+      }
+      
+      Write-Host "✅ Fichier index.html trouvé" -ForegroundColor Green
+      
+      # Aller au dossier parent (contexte de build)
+      Set-Location ..
+      
+      # Construire l'image Docker
+      Write-Host "📦 Construction de l'image: ${IMAGE_NAME}:${IMAGE_TAG}" -ForegroundColor Yellow
+      
+      docker build `
+        -f infrastructure/Dockerfile-terraform `
+        -t ${IMAGE_NAME}:${IMAGE_TAG} `
+        -t ${IMAGE_NAME}:latest `
+        .
+      
+      if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Image Docker construite avec succès!" -ForegroundColor Green
+          
+          # Afficher les images créées
+          docker images ${IMAGE_NAME}
+          
+          # Sauvegarder les infos dans un fichier
+          $dockerInfo = @"
+          IMAGE: ${IMAGE_NAME}:${IMAGE_TAG}
+          PORT: ${PORT}
+          BUILD_DATE: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+          TERRAFORM_ID: ${random_id.projet_id.hex}
+          COMMAND: docker run -d -p ${PORT}:80 ${IMAGE_NAME}:latest
+          "@
+          
+          $dockerInfo | Out-File -FilePath "infrastructure\\docker-image-info.txt" -Encoding UTF8
+          Write-Host "📄 Infos sauvegardées: infrastructure\\docker-image-info.txt" -ForegroundColor Gray
+          
+      } else {
+          Write-Host "❌ Erreur lors de la construction de l'image Docker" -ForegroundColor Red
+          exit 1
+      }
+    EOT
+    
+    interpreter = ["powershell", "-Command"]
+  }
+  
+  depends_on = [
+    local_file.docker_config,
+    random_id.projet_id
+  ]
+}
+
+# 8. NOUVEAU : Lancer le conteneur Docker
+resource "null_resource" "run_docker_container" {
+  triggers = {
+    image_built = null_resource.build_docker_image.id
+    always_run  = timestamp()
+  }
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      Write-Host "🚀 Démarrage du conteneur Docker..." -ForegroundColor Cyan
+      Write-Host "===================================" -ForegroundColor Cyan
+      
+      # Variables
+      $CONTAINER_NAME = "formulaire-devops"
+      $IMAGE_NAME = "formulaire-devops:latest"
+      $PORT = 8080
+      
+      # Arrêter et supprimer l'ancien conteneur si existant
+      Write-Host "🔄 Nettoyage de l'ancien conteneur..." -ForegroundColor Gray
+      docker stop $CONTAINER_NAME 2>$null
+      docker rm $CONTAINER_NAME 2>$null
+      
+      # Lancer le nouveau conteneur
+      Write-Host "▶️  Lancement du conteneur sur le port ${PORT}..." -ForegroundColor Yellow
+      
+      docker run -d `
+        -p ${PORT}:80 `
+        --name $CONTAINER_NAME `
+        --restart unless-stopped `
+        $IMAGE_NAME
+      
+      if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Conteneur démarré avec succès!" -ForegroundColor Green
+          
+          # Attendre que le conteneur soit prêt
+          Start-Sleep -Seconds 3
+          
+          # Vérifier le statut
+          Write-Host "🔍 Vérification du conteneur..." -ForegroundColor Gray
+          docker ps --filter "name=$CONTAINER_NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          
+          # Tester l'accès
+          Write-Host "🌐 Test d'accès au site..." -ForegroundColor Gray
+          try {
+              $response = Invoke-WebRequest -Uri "http://localhost:${PORT}" -TimeoutSec 10 -ErrorAction Stop
+              Write-Host "✅ Site accessible: http://localhost:${PORT}" -ForegroundColor Magenta
+              Write-Host "   Status: $($response.StatusCode) $($response.StatusDescription)" -ForegroundColor Gray
+          } catch {
+              Write-Host "⚠️  Le site met du temps à démarrer, réessayez dans quelques secondes" -ForegroundColor Yellow
+              Write-Host "   URL: http://localhost:${PORT}" -ForegroundColor Gray
+          }
+          
+          # Afficher les logs initiaux
+          Write-Host "📋 Logs initiaux du conteneur:" -ForegroundColor Gray
+          docker logs $CONTAINER_NAME --tail 5
+          
+      } else {
+          Write-Host "❌ Erreur lors du démarrage du conteneur" -ForegroundColor Red
+          Write-Host "💡 Essayez: docker logs $CONTAINER_NAME" -ForegroundColor Yellow
+      }
+    EOT
+    
+    interpreter = ["powershell", "-Command"]
+  }
+  
+  depends_on = [null_resource.build_docker_image]
+}
+
+# 5. Générer un rapport de déploiement MIS À JOUR
 resource "local_file" "rapport_deploiement" {
   filename = "${path.module}/rapports/deploiement-${formatdate("YYYY-MM-DD", timestamp())}.md"
   content  = <<-EOT
     # 📋 Rapport de Déploiement - Formulaire DevOps
     
-    ## ✅ DÉPLOIEMENT RÉUSSI - Sans Provider Docker
-    **IMPORTANT** : Ce déploiement utilise uniquement les providers :
-    - `hashicorp/random` (pour les IDs)
-    - `hashicorp/local` (pour les fichiers)
-    
-    ### 🔧 Évité : L'erreur OpenPGP du provider Docker
-    La configuration a été modifiée pour ne pas dépendre du provider
-    `kreuzwerker/docker` qui cause l'erreur de signature OpenPGP.
+    ## ✅ DÉPLOIEMENT COMPLET AVEC DOCKER AUTOMATIQUE
+    **IMPORTANT** : Terraform a créé l'image Docker automatiquement !
     
     ## 📊 Détails du déploiement
     - **Projet** : demo-devops
-    - **Statut** : ✅ Succès (alternative implémentée)
+    - **Statut** : ✅ Succès complet
     - **Date** : ${timestamp()}
     - **ID Terraform** : ${random_id.projet_id.hex}
+    - **Image Docker** : formulaire-devops:v1.0-${random_id.projet_id.hex}
+    - **Port** : 8080
     
     ## 📁 Fichiers générés
     1. ✅ `fix-openpgp-error.sh` - Script de résolution
     2. ✅ `documentation-projet.md` - Documentation mise à jour
-    3. ✅ `Dockerfile-terraform` - Configuration Docker indépendante
-    4. ✅ Ce rapport
+    3. ✅ `Dockerfile-terraform` - Configuration Docker optimisée
+    4. ✅ `docker-image-info.txt` - Informations de l'image Docker
+    5. ✅ Ce rapport
     
-    ## 🎯 Architecture mise à jour
-    ```
-    Avant : Terraform → Provider Docker → Erreur OpenPGP
-    Après : Terraform → Fichiers locaux → Docker séparé
-    ```
+    ## 🐳 IMAGE DOCKER CRÉÉE AUTOMATIQUEMENT
+    - **Nom** : formulaire-devops
+    - **Tag** : v1.0-${random_id.projet_id.hex} et latest
+    - **Port exposé** : 8080 → 80
+    - **Statut** : ✅ Construite et en cours d'exécution
     
-    ## 🐳 Déploiement Docker (SÉPARÉ de Terraform)
+    ## 🌐 ACCÈS AU SITE
+    **URL** : http://localhost:8080
+    
+    Pour accéder :
+    1. Ouvrez votre navigateur à l'URL ci-dessus
+    2. Ou exécutez : curl http://localhost:8080
+    
+    ## 🔧 COMMANDES DE GESTION
     ```bash
-    # 1. Construire depuis le dossier racine
-    docker build -f infrastructure/Dockerfile-terraform -t formulaire-devops .
+    # Voir les logs
+    docker logs formulaire-devops
     
-    # 2. Exécuter
-    docker run -d -p 8080:80 --name devops-formulaire formulaire-devops
+    # Entrer dans le conteneur
+    docker exec -it formulaire-devops sh
     
-    # 3. Vérifier
-    curl http://localhost:8080
+    # Redémarrer
+    docker restart formulaire-devops
+    
+    # Arrêter
+    docker stop formulaire-devops
+    
+    # Vérifier le statut
+    docker ps | grep formulaire-devops
     ```
     
-    ## 🔄 Workflow recommandé
-    1. **Terraform** : Génère configs et docs
-    2. **Docker CLI** : Build et run séparément
-    3. **GitHub Actions** : CI/CD complet
+    ## 📝 NOTES TECHNIQUES
+    - ✅ Image Docker construite automatiquement par Terraform
+    - ✅ Conteneur lancé sur le port 8080
+    - ✅ Vérification automatique de l'accès
+    - ✅ Fichier index.html préservé et utilisé
     
-    ## 📝 Notes techniques
-    - Le provider Docker Terraform n'est pas nécessaire
-    - Le Dockerfile fonctionne indépendamment
-    - Votre formulaire HTML reste inchangé
-    - Meilleure séparation des préoccupations
-    
-    ## 🚀 Prochaines étapes
-    1. ✅ Exécuter le script `fix-openpgp-error.sh` si besoin
-    2. ✅ `terraform apply` pour générer les fichiers
-    3. 🐳 `docker build` pour conteneuriser l'application
-    4. ⚡ Vérifier les workflows GitHub Actions
-    5. 🌐 Déployer sur GitHub Pages
+    ## 🚀 PROCHAINES ÉTAPES
+    1. ✅ Image Docker créée
+    2. ✅ Conteneur en cours d'exécution
+    3. ⚡ Vérifier les workflows GitHub Actions
+    4. 🌐 Déployer sur GitHub Pages
+    5. 📊 Monitorer les performances
     
     ---
-    *Rapport généré automatiquement - Solution OpenPGP implémentée*
+    *Rapport généré automatiquement - Image Docker créée par Terraform*
   EOT
   
   depends_on = [
     random_id.projet_id,
-    local_file.fix_openpgp_script
+    null_resource.run_docker_container
   ]
 }
 
@@ -374,7 +520,7 @@ resource "local_file" "providers_config" {
   EOT
 }
 
-# Outputs pour afficher les informations
+# Outputs MIS À JOUR avec infos Docker
 output "project_id" {
   value       = random_id.projet_id.hex
   description = "ID unique du projet"
@@ -386,75 +532,123 @@ output "generated_files" {
     local_file.documentation_projet.filename,
     local_file.docker_config.filename,
     local_file.rapport_deploiement.filename,
-    local_file.providers_config.filename
+    local_file.providers_config.filename,
+    "docker-image-info.txt"
   ]
   description = "Fichiers générés par Terraform (sans erreur OpenPGP)"
 }
 
+output "docker_image_info" {
+  value = <<-EOT
+    🐳 IMAGE DOCKER CRÉÉE AUTOMATIQUEMENT !
+    
+    ✅ Terraform a construit et lancé l'image Docker
+    
+    📋 INFORMATIONS :
+    - Nom : formulaire-devops
+    - Tag : v1.0-${random_id.projet_id.hex}
+    - Port : 8080
+    - URL : http://localhost:8080
+    - Conteneur : formulaire-devops
+    
+    🔧 COMMANDES :
+    # Vérifier l'image
+    docker images formulaire-devops
+    
+    # Vérifier le conteneur
+    docker ps | findstr formulaire-devops
+    
+    # Voir les logs
+    docker logs formulaire-devops
+    
+    # Accéder au site
+    start http://localhost:8080
+    
+    🎯 STATUT : Conteneur démarré sur le port 8080
+  EOT
+  
+  depends_on = [null_resource.run_docker_container]
+}
+
+output "site_access" {
+  value       = "http://localhost:8080"
+  description = "URL d'accès au formulaire déployé"
+}
+
+output "container_status" {
+  value = <<-EOT
+    📊 STATUT DU CONTENEUR DOCKER :
+    
+    Nom : formulaire-devops
+    Port : 8080 → 80
+    Image : formulaire-devops:latest
+    Statut : ✅ En cours d'exécution (vérifiez avec 'docker ps')
+    
+    Pour vérifier :
+    1. docker ps | findstr formulaire-devops
+    2. curl http://localhost:8080
+    3. docker logs formulaire-devops --tail 10
+  EOT
+}
+
 output "solution_applied" {
   value = <<-EOT
-    ✅ SOLUTION À L'ERREUR OPENPGP APPLIQUÉE !
+    ✅ SOLUTION COMPLÈTE APPLIQUÉE !
     
     🔧 CE QUI A ÉTÉ FAIT :
     1. ✅ Script de résolution créé : fix-openpgp-error.sh
     2. ✅ Provider Docker RETIRÉ de la configuration
     3. ✅ Documentation mise à jour avec solutions
     4. ✅ Dockerfile indépendant généré
-    5. ✅ Configuration providers sécurisée
+    5. ✅ Image Docker construite AUTOMATIQUEMENT
+    6. ✅ Conteneur lancé sur le port 8080
     
-    🎯 VOTRE PROJET FONCTIONNE MAINTENANT :
+    🎯 VOTRE PROJET EST MAINTENANT COMPLET :
     - Terraform utilise seulement random/local/null
     - Pas d'erreur OpenPGP
-    - Docker géré séparément via CLI
+    - Image Docker créée automatiquement
+    - Site accessible sur http://localhost:8080
     
-    🚀 COMMANDES :
-    1. Résoudre les problèmes existants :
-       chmod +x infrastructure/fix-openpgp-error.sh
-       ./infrastructure/fix-openpgp-error.sh
-    
-    2. Lancer Terraform :
-       terraform init   # ✅ Fonctionnera sans erreur
-       terraform plan
-       terraform apply
-    
-    3. Utiliser Docker (séparément) :
-       docker build -f infrastructure/Dockerfile-terraform -t mon-app .
-       docker run -d -p 8080:80 mon-app
+    🚀 RÉSUMÉ DES COMMANDES :
+    1. Résoudre les problèmes : ./fix-openpgp-error.sh
+    2. Appliquer Terraform : terraform apply
+    3. Accéder au site : http://localhost:8080
+    4. Vérifier Docker : docker ps | findstr formulaire-devops
     
     📞 SUPPORT :
     - Script : fix-openpgp-error.sh
     - Docs : documentation-projet.md
     - Docker : Dockerfile-terraform
+    - Infos : docker-image-info.txt
   EOT
 }
 
-output "docker_independent" {
+# Nouveau output pour les commandes Docker
+output "docker_commands" {
   value = <<-EOT
-    🐳 DOCKER INDÉPENDANT DE TERRAFORM
+    🔧 COMMANDES DOCKER UTILES :
     
-    ✅ AVANTAGES :
-    - Plus d'erreur OpenPGP
-    - Séparation claire des outils
-    - Meilleure pratique DevOps
+    # Gestion du conteneur
+    docker stop formulaire-devops       # Arrêter
+    docker start formulaire-devops      # Démarrer
+    docker restart formulaire-devops    # Redémarrer
+    docker rm formulaire-devops         # Supprimer
     
-    📋 WORKFLOW :
-    1. Terraform → Documentation + Configs
-    2. Docker CLI → Build + Run conteneurs
-    3. GitHub Actions → CI/CD
+    # Logs et inspection
+    docker logs formulaire-devops       # Voir les logs
+    docker logs -f formulaire-devops    # Suivre les logs
+    docker exec -it formulaire-devops sh # Shell interactif
+    docker inspect formulaire-devops    # Détails complets
     
-    🔧 COMMANDES DOCKER :
-    # Build depuis la racine
-    docker build -f infrastructure/Dockerfile-terraform -t formulaire-devops .
+    # Gestion des images
+    docker images                       # Lister toutes les images
+    docker rmi formulaire-devops        # Supprimer l'image
     
-    # Run
-    docker run -d -p 8080:80 formulaire-devops
+    # Nettoyage
+    docker system prune -a              # Nettoyer tout
     
-    # Vérifier
-    curl http://localhost:8080
-    
-    # Arrêter
-    docker stop formulaire-devops
-    
-    ℹ️ Votre formulaire HTML : index.html (inchangé)
+    # Reconstruction manuelle
+    docker build -f infrastructure/Dockerfile-terraform -t formulaire-devops ..
+    docker run -d -p 8080:80 --name formulaire-devops formulaire-devops
   EOT
 }
