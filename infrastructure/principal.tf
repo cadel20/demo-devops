@@ -153,33 +153,16 @@ resource "docker_container" "mon_site" {
   ]
 }
 
-# Alternative si le provider Docker pose problème
-resource "null_resource" "docker_backup" {
-  triggers = {
-    always_run = timestamp()
-  }
-  
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo "🐳 Lancement du conteneur Docker via Terraform..."
-      docker run -d \
-        --name mon-site-backup-${random_id.projet_id.hex} \
-        -p 8081:80 \
-        -v ${abspath("..")}/index.html:/usr/share/nginx/html/index.html:ro \
-        nginx:alpine
-      echo "✅ Conteneur lancé sur http://localhost:8081"
-    EOT
-    
-    interpreter = ["PowerShell", "-Command"]
-  }
-  
-  provisioner "local-exec" {
-    when    = destroy
-    command = <<-EOT
-      docker stop mon-site-backup-${random_id.projet_id.hex} 2>$null
-      docker rm mon-site-backup-${random_id.projet_id.hex} 2>$null
-    EOT
-    
-    interpreter = ["PowerShell", "-Command"]
-  }
-}
+# ⚠️ COMMENTÉ car cause des erreurs - décommentez si besoin
+# resource "null_resource" "docker_backup" {
+#   triggers = {
+#     always_run = timestamp()
+#   }
+#   
+#   provisioner "local-exec" {
+#     command = <<-EOT
+#       echo "Alternative Docker container"
+#       docker run -d -p 8081:80 --name backup-site nginx:alpine
+#     EOT
+#   }
+# }
