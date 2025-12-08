@@ -10,7 +10,7 @@ terraform {
 provider "docker" {}
 
 resource "docker_image" "app" {
-  name         = "cadel2/demo-devops:latest"
+  name         = "cadel2/demo-devops-app:latest"
   keep_locally = true
 }
 
