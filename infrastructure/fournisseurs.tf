@@ -1,3 +1,4 @@
+# Configuration Terraform avec Docker - Mode développement
 terraform {
   required_version = ">= 1.0"
   
@@ -12,10 +13,9 @@ terraform {
       version = "~> 3.5"
     }
     
-    # ⭐ ALTERNATIVE : Provider Docker officieux sans problème GPG
     docker = {
-      source  = "terraform.local/local/docker"  # Provider local
-      version = "1.0.0"
+      source  = "kreuzwerker/docker"
+      version = "3.0.2"  # Version FIXE sans ~
     }
   }
   
@@ -23,3 +23,10 @@ terraform {
     path = "terraform.tfstate"
   }
 }
+
+provider "docker" {
+  # Laisser vide pour auto-détection
+}
+
+provider "local" {}
+provider "random" {}
