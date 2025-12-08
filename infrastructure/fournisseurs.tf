@@ -1,4 +1,4 @@
-# Configuration Terraform avec Docker - Version corrigée
+# Configuration Terraform SANS Docker (temporaire)
 terraform {
   required_version = ">= 1.0"
   
@@ -13,10 +13,11 @@ terraform {
       version = "~> 3.5"
     }
     
-    docker = {
-      source  = "kreuzwerker/docker"
-      version = "~> 3.0.2"  # Version spécifique sans problème GPG
-    }
+    # ⚠️ COMMENTÉ TEMPORAIREMENT - problème GPG
+    # docker = {
+    #   source  = "kreuzwerker/docker"
+    #   version = "~> 3.0"
+    # }
   }
   
   backend "local" {
@@ -24,11 +25,8 @@ terraform {
   }
 }
 
-# Provider Docker avec configuration sécurisée
-provider "docker" {
-  # Configuration par défaut - Terraform détectera automatiquement
-  # Pas besoin de spécifier 'host' dans la plupart des cas
-}
+# ⚠️ Provider Docker commenté temporairement
+# provider "docker" {}
 
 provider "local" {}
 provider "random" {}
