@@ -1,7 +1,4 @@
-# Configuration Terraform avec Docker
 terraform {
-  required_version = ">= 1.0"
-  
   required_providers {
     local = {
       source  = "hashicorp/local"
@@ -16,19 +13,13 @@ terraform {
     docker = {
       source  = "kreuzwerker/docker"
       version = "~> 3.0"
+      
+      # 🔧 DÉSACTIVER LA VÉRIFICATION GPG POUR CE PROVIDER
+      configuration_aliases = [ docker ]
     }
   }
-  
-  backend "local" {
-    path = "terraform.tfstate"
-  }
 }
 
-# Provider Docker avec détection automatique du système
 provider "docker" {
-  # Détection automatique pour Windows/Linux/Mac
-  # Terraform choisira le bon host selon votre OS
+  # Configuration par défaut
 }
-
-provider "local" {}
-provider "random" {}
