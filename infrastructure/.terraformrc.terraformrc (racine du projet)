@@ -1,4 +1,0 @@
-# .terraformrc (racine du projet)
-plugin_cache_dir   = "$HOME/.terraform.d/plugin-cache"
-disable_checkpoint = true
-skip_provider_verification = true  # IMPORTANT : Désactive vérification GPG
