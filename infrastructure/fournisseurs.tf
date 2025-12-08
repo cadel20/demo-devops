@@ -1,4 +1,4 @@
-# Configuration Terraform avec Docker - Mode développement
+# Configuration Terraform avec Docker
 terraform {
   required_version = ">= 1.0"
   
@@ -15,7 +15,7 @@ terraform {
     
     docker = {
       source  = "kreuzwerker/docker"
-      version = "3.0.2"  # Version FIXE sans ~
+      version = "~> 3.0"
     }
   }
   
@@ -24,8 +24,10 @@ terraform {
   }
 }
 
+# Provider Docker avec détection automatique du système
 provider "docker" {
-  # Laisser vide pour auto-détection
+  # Détection automatique pour Windows/Linux/Mac
+  # Terraform choisira le bon host selon votre OS
 }
 
 provider "local" {}
