@@ -76,14 +76,21 @@ resource "random_id" "projet_id" {
   byte_length = 4
 }
 
-# 2. Créer le dossier rapports localement
+# 2. Créer le dossier rapports - Version Windows PowerShell
 resource "null_resource" "create_reports_dir" {
   triggers = {
     always_run = timestamp()
   }
   
   provisioner "local-exec" {
-    command = "mkdir -p ${path.module}/rapports"
+    command = <<-EOT
+      $reportsPath = "${path.module}\\rapports"
+      if (-not (Test-Path $reportsPath)) {
+          New-Item -Path $reportsPath -ItemType Directory -Force | Out-Null
+          Write-Host "Dossier créé: $reportsPath"
+      }
+    EOT
+    interpreter = ["powershell", "-Command"]
   }
 }
 

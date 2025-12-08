@@ -1,0 +1,47 @@
+# Dockerfile optimisé pour votre formulaire HTML
+# Généré par Terraform - Ne nécessite PAS le provider Docker Terraform
+    
+FROM nginx:alpine
+    
+LABEL mainteneur="cadel20"
+LABEL version="1.0"
+LABEL description="Formulaire DevOps - Déployé avec Docker"
+    
+# Copier votre formulaire HTML
+COPY index.html /usr/share/nginx/html/
+    
+# Configuration Nginx optimisée
+RUN echo 'server { \
+    listen 80; \
+    server_name localhost; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    \
+    # Compression Gzip \
+    gzip on; \
+    gzip_vary on; \
+    gzip_min_length 1024; \
+    gzip_types text/plain text/css text/javascript application/javascript; \
+    \
+    # Cache des fichiers statiques \
+    location ~* \.(js|css|html)$ { \
+        expires 1d; \
+        add_header Cache-Control "public"; \
+    } \
+    \
+    # Service du formulaire \
+    location / { \
+        try_files \$uri \$uri/ /index.html; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+    
+# Page de santé
+RUN echo 'OK' > /usr/share/nginx/html/healthz
+    
+EXPOSE 80
+    
+CMD ["nginx", "-g", "daemon off;"]
+    
+# ℹ️ Note : Ce Dockerfile est indépendant de Terraform
+# Build : docker build -f infrastructure/Dockerfile-terraform -t myapp .
+# Run   : docker run -d -p 8080:80 myapp
